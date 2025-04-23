@@ -64,17 +64,17 @@ class I18nContent(str):
         lang: str = None,
         post_lang_selector: Type["PostLanguageSelector"] | None = None,
     ):
-        self.text = text
-        self.variables = variables or {}
-        self.lang = lang
-        self.post_lang_selector = post_lang_selector or PostLanguageSelector
-        self.i18n_dict = i18n_dict
+        self._text = text
+        self._variables = variables or {}
+        self._lang = lang
+        self._post_lang_selector = post_lang_selector or PostLanguageSelector
+        self._i18n_dict = i18n_dict
 
     def __str__(self) -> str:
-        return self.__getitem__(self.lang)
+        return self.__getitem__(self._lang)
 
     def __repr__(self) -> str:
-        return self.__getitem__(self.lang)
+        return self.__getitem__(self._lang)
 
     def __getitem__(self, lang: Union[int, slice, any]) -> str:
         """_('内容')[后置语言选择器]"""
@@ -85,10 +85,10 @@ class I18nContent(str):
     def __call__(self, lang: Union[int, slice, any]):
         """_('内容')(后置语言选择器)"""
         return str(
-            self.post_lang_selector(
-                text=self.text,
-                i18n_dict=self.i18n_dict,
-                variables=self.variables,
+            self._post_lang_selector(
+                text=self._text,
+                i18n_dict=self._i18n_dict,
+                variables=self._variables,
                 lang=lang,
             )
         )
