@@ -2,12 +2,12 @@ from pathlib import Path
 
 import yaml
 
-from ..config import ic
-
 
 class Loader:
-    @staticmethod
-    def load_i18n_file(lang: str | list[str] = None) -> dict:
+    def __init__(self, i18n_file_dir: str | Path):
+        self.i18n_file_dir = i18n_file_dir
+
+    def load_i18n_file(self, lang: str | list[str] = None) -> dict:
         """
         加载i18n目录下的yaml文件
         :return: i18n字典
@@ -16,7 +16,7 @@ class Loader:
             lang = lang if isinstance(lang, list) else [lang]
 
         i18n_dict = {}
-        i18n_files = ic.i18n_dir.glob("**/*.yaml")
+        i18n_files = self.i18n_file_dir.glob("**/*.yaml")
         if lang:
             lang = lang if isinstance(lang, list) else [lang]
             i18n_files = [
@@ -32,6 +32,3 @@ class Loader:
                 file.read_text(encoding="utf-8")
             )
         return i18n_dict
-
-
-

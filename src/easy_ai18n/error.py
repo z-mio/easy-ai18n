@@ -9,5 +9,6 @@ class BuildedError(Exception):
 class FormatError(Exception):
     pass
 
+
 class EvaluateError(Exception):
     pass

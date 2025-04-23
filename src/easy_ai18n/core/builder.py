@@ -19,14 +19,17 @@ from ..error import BuildedError
 from ..translator import GoogleTranslator, BaseItemTranslator, BaseBulkTranslator
 from ..log import logger
 
-from ..utiles import gen_id
+from ..utiles import gen_id, to_list, to_path
 
 
 class Builder:
     def __init__(
         self,
         target_lang: str | list[str] = "en",
+        sep: str = None,
+        i18n_function_name: str | list[str] = None,
         project_dir: str = None,
+        i18n_file_dir: str | Path = None,
         include: list[str] = None,
         exclude: list[str] = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
@@ -36,29 +39,30 @@ class Builder:
         """
         初始化Builder
         :param target_lang: 目标语言
+        :param sep: 分隔符
+        :param i18n_function_name: 翻译函数名
         :param project_dir: 需要翻译的项目的根目录
+        :param i18n_file_dir: 翻译文件目录
         :param include: 包含的文件或目录
         :param exclude: 排除的文件或目录
         :param translator: 翻译器, 默认为 GoogleTranslator
         :param disable_progress_bar: 禁用翻译进度条
         :param max_concurrent: 翻译时的并发数
         """
-        self.project_dir = (
-            Path(os.getcwd()) if project_dir is None else Path(project_dir)
-        )
+        self.project_dir = to_path(project_dir) or Path(os.getcwd())
         self.include = include or []
         self.exclude = exclude or []
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
-        self.func_name = ic.i18n_function_name
-        self.target_lang = (
-            target_lang if isinstance(target_lang, list) else [target_lang]
-        )
+        self.i18n_function_name = to_list(i18n_function_name) or ic.def_i18n_func_name
+        self.sep = sep or ic.def_sep
+        self.target_lang = to_list(target_lang)
+        self.i18n_file_dir = to_path(i18n_file_dir) or ic.i18n_dir
         self.translator = translator or GoogleTranslator()
 
         self.project_files = self.load_file()
         self.disable_progress_bar = disable_progress_bar
         self.max_concurrent = max_concurrent or 30
-        self._i18n_dict = Loader.load_i18n_file(self.target_lang)
+        self._i18n_dict = Loader(self.i18n_file_dir).load_i18n_file(self.target_lang)
 
     async def run(self) -> None:
         try:
@@ -138,42 +142,35 @@ class Builder:
         return updated_i18n_dict, to_be_translated
 
     def load_file(self):
-        """
-        加载项目文件：
-        - include 列表非空时，只采纳 include 中指定的文件或目录下的 .py 文件；
-        - include 为空时，先剔除 default_exclude，再根据 exclude 列表过滤；
-        :return: List[Path]，项目中符合条件的 .py 文件路径
-        """
         project_files = []
-
-        if self.include:
-            include_files = {name for name in self.include if name.endswith(".py")}
-            include_dirs = {name for name in self.include if not name.endswith(".py")}
-        else:
-            include_files = set()
-            include_dirs = set()
+        include_paths = [Path(p) for p in self.include] if self.include else []
+        exclude_paths = [Path(p) for p in self.exclude]
 
         for root, dirs, files in self.project_dir.walk():
-            dirs[:] = [d for d in dirs if d not in self.default_exclude]
-
-            if not self.include:
-                dirs[:] = [d for d in dirs if d not in self.exclude]
-
+            # 先做目录排除
+            dirs[:] = [
+                d
+                for d in dirs
+                if not any(
+                    (Path(root) / d).relative_to(self.project_dir).match(str(exc))
+                    for exc in self.default_exclude + exclude_paths
+                )
+            ]
             for fname in files:
                 if not fname.endswith(".py"):
                     continue
 
-                full_path = Path(root) / fname
-                rel_parts = full_path.relative_to(self.project_dir).parts
+                full = Path(root) / fname
+                rel = full.relative_to(self.project_dir)
 
-                if self.include:
-                    in_file_list = fname in include_files
-                    in_dir_list = bool(rel_parts and rel_parts[0] in include_dirs)
-                    if in_file_list or in_dir_list:
-                        project_files.append(full_path)
-                else:
-                    if fname not in self.exclude:
-                        project_files.append(full_path)
+                if include_paths:
+                    if not any(str(rel).startswith(str(ip)) for ip in include_paths):
+                        continue
+
+                if any(str(rel).startswith(str(ep)) for ep in exclude_paths):
+                    continue
+
+                project_files.append(full)
 
         return project_files
 
@@ -280,24 +277,24 @@ class Builder:
         else:
             raise ValueError("translation_mode must be 'item' or 'bulk'")
 
-    @staticmethod
-    def extract_translatable_strings_by_file(file: Path) -> list[str]:
+    def extract_translatable_strings_by_file(self, file: Path) -> list[str]:
         """
         从文件中提取出所有需要翻译的字符串
         :param file: 文件路径
         :return:
         """
         module = ast.parse(file.read_text(encoding="utf-8"))
-        return ASTParser().extract_all_strings(node=module)
+        return ASTParser().extract_all_strings(
+            node=module, sep=self.sep, i18n_function_name=self.i18n_function_name
+        )
 
-    @staticmethod
-    def load_i18n_file() -> dict:
+    def load_i18n_file(self) -> dict:
         """
         加载i18n目录下的yaml文件
         :return: i18n字典
         """
         i18n_dict = {}
-        i18n_files = ic.i18n_dir.glob("**/*.yaml")
+        i18n_files = self.i18n_file_dir.glob("**/*.yaml")
         if not i18n_files:
             return {}
         for file in i18n_files:
@@ -308,16 +305,15 @@ class Builder:
             )
         return i18n_dict
 
-    @staticmethod
-    def output_dict_to_yaml(translated_dict: dict):
+    def output_dict_to_yaml(self, translated_dict: dict):
         """
         将翻译结果输出到文件
         :param translated_dict: 翻译结果字典
         :return:
         """
-        [os.remove(i) for i in ic.i18n_dir.glob("**/*.yaml")]
+        [os.remove(i) for i in self.i18n_file_dir.glob("**/*.yaml")]
         for lang in translated_dict:
-            with open(ic.i18n_dir / f"{lang}.yaml", "w", encoding="utf-8") as f:
+            with open(self.i18n_file_dir / f"{lang}.yaml", "w", encoding="utf-8") as f:
                 yaml.dump(translated_dict[lang], f, allow_unicode=True)
 
     @staticmethod

@@ -6,6 +6,7 @@ import abc
 import ast
 import inspect
 import sys
+from pathlib import Path
 from types import FrameType
 from typing import Type, Union
 
@@ -13,15 +14,16 @@ from .loader import Loader
 from .parser import ASTParser, StringData
 from ..config import ic
 from ..log import logger
-from ..utiles import gen_id
+from ..utiles import gen_id, to_list
 
 
 class PreLanguageSelector(abc.ABC):
     """前置语言选择器"""
 
-    def __init__(self, *, i18n: "I18n", lang: str = None):
+    def __init__(self, *, i18n: "I18n", sep: str, lang: str = None):
         self.i18n = i18n
         self.lang = lang
+        self.sep = sep
 
     def __str__(self) -> str:
         return ""
@@ -29,7 +31,7 @@ class PreLanguageSelector(abc.ABC):
     def __repr__(self) -> str:
         return ""
 
-    def __call__(self, *args, sep: str = ic.def_sep) -> str:
+    def __call__(self, *args, sep: str = None) -> str:
         """
         调用后置语言选择器
         _[前置语言选择器]('内容')
@@ -38,7 +40,7 @@ class PreLanguageSelector(abc.ABC):
         :return:
         """
         frame = inspect.currentframe().f_back
-        return self.i18n.t(*args, sep=sep, frame=frame)[self.lang]
+        return self.i18n.t(*args, sep=sep or self.sep, frame=frame)[self.lang]
 
 
 class I18nContent(str):
@@ -153,6 +155,9 @@ class I18n:
         self,
         languages: str | list[str] = None,
         global_lang: str = None,
+        sep: str = None,
+        i18n_file_dir: str | Path = None,
+        i18n_function_name: str | list[str] = None,
         pre_lang_selector: Type[PreLanguageSelector] | None = None,
         post_lang_selector: Type[PostLanguageSelector] | None = None,
     ):
@@ -160,6 +165,7 @@ class I18n:
         初始化I18n
         :param languages: 要启用的语言
         :param global_lang: 全局默认使用的语言
+        :param sep: 字符串分隔符
         :param pre_lang_selector: 前置语言选择器类
         :param post_lang_selector: 后置语言选择器类
         """
@@ -167,13 +173,19 @@ class I18n:
         self._parse_failures: set[str] = set()
 
         self.global_lang = global_lang
-        self.languages = languages
+        self.languages = to_list(languages)
+        if self.languages and self.global_lang not in self.languages:
+            self.languages.append(self.global_lang)
+
+        self.sep = sep or ic.def_sep
+        self.i18n_file_dir = i18n_file_dir or ic.i18n_dir
+        self.i18n_function_name = to_list(i18n_function_name) or ic.i18n_function_name
         self.pre_lang_selector = pre_lang_selector or PreLanguageSelector
         self.post_lang_selector = post_lang_selector or PostLanguageSelector
         self.content = I18nContent
-        self.i18n_dict = Loader.load_i18n_file(self.languages)
+        self.i18n_dict = Loader(self.i18n_file_dir).load_i18n_file(self.languages)
 
-    def t(self, *args, sep: str = ic.def_sep, frame: FrameType = None) -> I18nContent:  # type: ignore
+    def t(self, *args, sep: str = None, frame: FrameType = None) -> I18nContent:  # type: ignore
         """
         入口函数
 
@@ -184,6 +196,7 @@ class I18n:
         Returns:
             PostLanguageSelector 对象
         """
+        sep = sep or self.sep
         original = sep.join([str(item) for item in args])
         f = frame or sys._getframe(1)
         if not f:
@@ -211,7 +224,10 @@ class I18n:
 
         try:
             result = ASTParser().extract_string_data(
-                frame=f, sep=sep, call_nodes=call_nodes
+                frame=f,
+                sep=sep,
+                call_nodes=call_nodes,
+                i18n_function_name=self.i18n_function_name,
             )
             return self._handle_cache(original, cache_key, result)
         except Exception as e:
@@ -255,9 +271,9 @@ class I18n:
 
     def __getitem__(self, lang: any) -> PreLanguageSelector:
         """调用前置语言选择器"""
-        return self.pre_lang_selector(i18n=self, lang=lang)
+        return self.pre_lang_selector(i18n=self, lang=lang, sep=self.sep)
 
-    def __call__(self, *args, sep: str = ic.def_sep) -> I18nContent:
+    def __call__(self, *args, sep: str = None) -> I18nContent:
         """调用入口函数"""
         frame = inspect.currentframe().f_back
-        return self.t(*args, sep=sep, frame=frame)
+        return self.t(*args, sep=sep or self.sep, frame=frame)

@@ -49,20 +49,36 @@ pip install easy-ai18n
 
 ### 🧪 Simple Example
 
+`/i18n.py`
+
 ```python
 from easy_ai18n import EasyAI18n
 
-i18n = EasyAI18n(target_lang=["ru", "ja", 'zh-CN'])
-i18n.build()
+i18n = EasyAI18n()
 
 _ = i18n.t()
 
-print(_("Hello, world!")['zh-CN'])
+if __name__ == "__main__":
+    i18n.build(["ja"])
+```
+
+`/main.py`
+
+```python
+from i18n import _
+
+
+def main():
+    print(_("Hello, world!")['ja'])
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ## 🗂️ Project Structure
 
-```
+```text
 easy_ai18n
 ├── core                 # Core functionality module
 │   ├── builder.py       # Builder: extract, translate, generate YAML files
@@ -75,38 +91,6 @@ easy_ai18n
 ```
 
 ## 📘 Usage Tutorial
-
-### ⚙️ Initialize `EasyAI18n` Instance
-
-```python
-from easy_ai18n import EasyAI18n, PreLanguageSelector, PostLanguageSelector
-from easy_ai18n.translator import GoogleTranslator
-
-# Initialize EasyAI18n instance
-i18n = EasyAI18n(
-    global_lang="zh",  # Global default language
-    target_lang=["zh", "ja"],  # Target translation languages
-    languages=["zh", "ja"],  # Enabled languages (default is target_lang)
-    project_dir="/path/to/your/project",  # Root directory (default is current dir)
-    include=[],  # Included files/directories
-    exclude=[".idea"],  # Excluded files/directories
-    i18n_file_dir="i18n",  # Directory to store translation files
-    func_name=["_"],  # Translation function names (supports multiple)
-    sep=" ",  # Separator (default is space)
-    translator=GoogleTranslator(),  # Translator (default is Google)
-    pre_lang_selector=PreLanguageSelector,  # Pre language selector
-    post_lang_selector=PostLanguageSelector  # Post language selector
-)
-
-# Build translation files
-i18n.build()
-
-# Set translation function, here we use _, can be customized
-_ = i18n.t()
-
-# Put strings to be translated inside the function
-print(_("Hello, world!"))
-```
 
 ### 🛠️ Custom Translation Function Names
 
@@ -132,37 +116,46 @@ from easy_ai18n.translator import OpenAIYAMLTranslator
 
 translator = OpenAIYAMLTranslator(api_key=..., base_url=..., model='gpt-4o-mini')
 
-i18n = EasyAI18n(target_lang=["ru", "ja", 'zh-CN'], translator=translator)
-i18n.build()
+i18n = EasyAI18n()
+i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
 
 _ = i18n.t()
 
-print(_("Hello, world!")['zh-CN'])
+print(_("Hello, world!")['zh-Hant'])
 ```
 
 ### 👥 Multi-user Language Scenarios (e.g. Telegram Bot)
 
 Use custom language selector to dynamically select languages in multi-user environments:
 
-```python
-from pyrogram import Client
-from pyrogram.types import Message
+`/i18n.py`:
 
+```python
+from pyrogram.types import Message
 from easy_ai18n import EasyAI18n, PostLanguageSelector
 
 
 class MyPostLanguageSelector(PostLanguageSelector):
     def __getitem__(self, msg: Message):
-        # Get user's language
+        # ......
         lang = msg.from_user.language_code
         return super().__getitem__(lang)
 
 
-i18n = EasyAI18n(
-    target_lang=['zh', 'ru'],
-    post_lang_selector=MyPostLanguageSelector,
-)
-_ = i18n.t()
+i18n = EasyAI18n()
+
+_ = i18n.t(post_lang_selector=MyPostLanguageSelector)
+
+if __name__ == "__main__":
+    i18n.build(target_lang=['en', 'ru'])
+```
+
+`/bot.py`:
+
+```python
+from pyrogram import Client
+from pyrogram.types import Message
+from i18n import _
 
 bot = Client("my_bot")
 
@@ -173,7 +166,5 @@ async def start(__, msg: Message):
 
 
 if __name__ == "__main__":
-    bot.loop.run_until_complete(i18n.build_async())
     bot.run()
 ```
-

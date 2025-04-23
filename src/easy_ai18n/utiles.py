@@ -1,4 +1,5 @@
 import hashlib
+from pathlib import Path
 
 
 def gen_id(text) -> str:
@@ -20,3 +21,23 @@ def singleton(cls):
         return instances[cls]
 
     return get_instance
+
+
+def to_list(obj):
+    if isinstance(obj, list):
+        return obj
+    elif obj is None:
+        return []
+    else:
+        return [obj]
+
+
+def to_path(path):
+    if isinstance(path, str):
+        return Path(path)
+    elif path is None:
+        return None
+    elif isinstance(path, Path):
+        return path
+    else:
+        return path

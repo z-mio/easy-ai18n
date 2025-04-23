@@ -48,20 +48,36 @@ pip install easy-ai18n
 
 ### 🧪 シンプルな例
 
+`/i18n.py`
+
 ```python
 from easy_ai18n import EasyAI18n
 
-i18n = EasyAI18n(target_lang=["ru", "ja", 'zh-CN'])
-i18n.build()
+i18n = EasyAI18n()
 
 _ = i18n.t()
 
-print(_("Hello, world!")['zh-CN'])
+if __name__ == "__main__":
+    i18n.build(["ja"])
+```
+
+`/main.py`
+
+```python
+from i18n import _
+
+
+def main():
+    print(_("Hello, world!")['ja'])
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ## 🗂️ プロジェクト構成
 
-```
+```text
 easy_ai18n
 ├── core                 # コア機能モジュール
 │   ├── builder.py       # ビルダー：抽出、翻訳、YAMLファイルの生成
@@ -74,38 +90,6 @@ easy_ai18n
 ```
 
 ## 📘 使い方ガイド
-
-### ⚙️ `EasyAI18n` インスタンスの初期化
-
-```python
-from easy_ai18n import EasyAI18n, PreLanguageSelector, PostLanguageSelector
-from easy_ai18n.translator import GoogleTranslator
-
-# EasyAI18n インスタンスの初期化
-i18n = EasyAI18n(
-    global_lang="zh",  # グローバルデフォルト言語
-    target_lang=["zh", "ja"],  # 翻訳対象言語
-    languages=["zh", "ja"],  # 有効な言語（デフォルトは target_lang）
-    project_dir="/path/to/your/project",  # プロジェクトのルートディレクトリ
-    include=[],  # 含めるファイル/ディレクトリ
-    exclude=[".idea"],  # 除外するファイル/ディレクトリ
-    i18n_file_dir="i18n",  # 翻訳ファイルの保存ディレクトリ
-    func_name=["_"],  # 翻訳関数名（複数可）
-    sep=" ",  # セパレーター（デフォルトはスペース）
-    translator=GoogleTranslator(),  # 翻訳器（デフォルトは Google）
-    pre_lang_selector=PreLanguageSelector,  # プリ言語セレクター
-    post_lang_selector=PostLanguageSelector  # ポスト言語セレクター
-)
-
-# 翻訳ファイルのビルド
-i18n.build()
-
-# 翻訳関数を設定（ここでは _ を使用）
-_ = i18n.t()
-
-# 翻訳する文字列を関数に渡す
-print(_("Hello, world!"))
-```
 
 ### 🛠️ 翻訳関数名のカスタマイズ
 
@@ -131,37 +115,46 @@ from easy_ai18n.translator import OpenAIYAMLTranslator
 
 translator = OpenAIYAMLTranslator(api_key=..., base_url=..., model='gpt-4o-mini')
 
-i18n = EasyAI18n(target_lang=["ru", "ja", 'zh-CN'], translator=translator)
-i18n.build()
+i18n = EasyAI18n()
+i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
 
 _ = i18n.t()
 
-print(_("Hello, world!")['zh-CN'])
+print(_("Hello, world!")['zh-Hant'])
 ```
 
 ### 👥 マルチユーザー言語対応（例：Telegram Bot）
 
 マルチユーザー環境で動的に言語を選択するには、カスタム言語セレクターを使用します：
 
-```python
-from pyrogram import Client
-from pyrogram.types import Message
+`/i18n.py`:
 
+```python
+from pyrogram.types import Message
 from easy_ai18n import EasyAI18n, PostLanguageSelector
 
 
 class MyPostLanguageSelector(PostLanguageSelector):
     def __getitem__(self, msg: Message):
-        # ユーザーの言語を取得
+        # ......
         lang = msg.from_user.language_code
         return super().__getitem__(lang)
 
 
-i18n = EasyAI18n(
-    target_lang=['zh', 'ru'],
-    post_lang_selector=MyPostLanguageSelector,
-)
-_ = i18n.t()
+i18n = EasyAI18n()
+
+_ = i18n.t(post_lang_selector=MyPostLanguageSelector)
+
+if __name__ == "__main__":
+    i18n.build(target_lang=['en', 'ru'])
+```
+
+`/bot.py`:
+
+```python
+from pyrogram import Client
+from pyrogram.types import Message
+from i18n import _
 
 bot = Client("my_bot")
 
@@ -172,7 +165,5 @@ async def start(__, msg: Message):
 
 
 if __name__ == "__main__":
-    bot.loop.run_until_complete(i18n.build_async())
     bot.run()
 ```
-

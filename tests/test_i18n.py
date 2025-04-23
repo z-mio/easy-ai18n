@@ -2,12 +2,12 @@ from src.easy_ai18n import EasyAI18n
 import os
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
-i18n = EasyAI18n(target_lang=["en", "ja"])
+i18n = EasyAI18n()
 _ = i18n.t()
 
 
 def test_build():
-    i18n.build()
+    i18n.build(target_lang=["en", "ja"])
     assert i18n.i18n_file_dir.joinpath("en.yaml").exists()
     assert i18n.i18n_file_dir.joinpath("ja.yaml").exists()
 

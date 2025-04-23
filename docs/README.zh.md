@@ -48,20 +48,36 @@ pip install easy-ai18n
 
 ### 🧪 简单示例
 
+`/i18n.py`
+
 ```python
 from easy_ai18n import EasyAI18n
 
-i18n = EasyAI18n(target_lang=["ru", "ja", 'zh-CN'])
-i18n.build()
+i18n = EasyAI18n()
 
 _ = i18n.t()
 
-print(_("Hello, world!")['zh-CN'])
+if __name__ == "__main__":
+    i18n.build(["ja"])
+```
+
+`/main.py`
+
+```python
+from i18n import _
+
+
+def main():
+    print(_("Hello, world!")['ja'])
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 ## 🗂️ 项目结构
 
-```
+```text
 easy_ai18n
 ├── core                 # 核心功能模块
 │   ├── builder.py       # 构建器：提取、翻译、生成 YAML 文件
@@ -75,40 +91,6 @@ easy_ai18n
 ```
 
 ## 📘 使用教程
-
-### ⚙️ 初始化 `EasyAI18n` 实例
-
-```python
-from easy_ai18n import EasyAI18n, PreLanguageSelector, PostLanguageSelector
-from easy_ai18n.translator import GoogleTranslator
-
-# 初始化 EasyAI18n 实例
-i18n = EasyAI18n(
-    global_lang="zh",  # 全局默认语言
-    target_lang=["zh", "ja"],  # 翻译目标语言
-    languages=["zh", "ja"],  # 启用语言（默认为目标语言）
-    project_dir="/path/to/your/project",  # 项目根目录（默认当前目录）
-    include=[],  # 包含的文件/目录
-    exclude=[".idea"],  # 排除的文件/目录
-    i18n_file_dir="i18n",  # 存放翻译文件的目录
-    func_name=["_"],  # 翻译函数名称（支持多个）
-    sep=" ",  # 分隔符（默认空格）
-    translator=GoogleTranslator(),  # 翻译器（默认 Google）
-    pre_lang_selector=PreLanguageSelector,  # 前置语言选择器
-    post_lang_selector=PostLanguageSelector  # 后置语言选择器
-)
-
-# 构建翻译文件
-i18n.build()
-
-# 设置翻译函数, 这里使用_, 可以自定义
-_ = i18n.t()
-
-# 将需要翻译的字符串放进翻译函数中
-print(_("Hello, world!"))
-
-
-```
 
 ### 🛠️ 自定义翻译函数名称
 
@@ -134,37 +116,46 @@ from easy_ai18n.translator import OpenAIYAMLTranslator
 
 translator = OpenAIYAMLTranslator(api_key=..., base_url=..., model='gpt-4o-mini')
 
-i18n = EasyAI18n(target_lang=["ru", "ja", 'zh-CN'], translator=translator)
-i18n.build()
+i18n = EasyAI18n()
+i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
 
 _ = i18n.t()
 
-print(_("Hello, world!")['zh-CN'])
+print(_("Hello, world!")['zh-Hant'])
 ```
 
 ### 👥 多用户语言场景（如 Telegram Bot）
 
 通过自定义语言选择器, 在多用户环境中实现动态语言选择:
 
-```python
-from pyrogram import Client
-from pyrogram.types import Message
+`/i18n.py`:
 
+```python
+from pyrogram.types import Message
 from easy_ai18n import EasyAI18n, PostLanguageSelector
 
 
 class MyPostLanguageSelector(PostLanguageSelector):
     def __getitem__(self, msg: Message):
-        # 获取用户语言
+        # ......
         lang = msg.from_user.language_code
         return super().__getitem__(lang)
 
 
-i18n = EasyAI18n(
-    target_lang=['zh', 'ru'],
-    post_lang_selector=MyPostLanguageSelector,
-)
-_ = i18n.t()
+i18n = EasyAI18n()
+
+_ = i18n.t(post_lang_selector=MyPostLanguageSelector)
+
+if __name__ == "__main__":
+    i18n.build(target_lang=['en', 'ru'])
+```
+
+`/bot.py`:
+
+```python
+from pyrogram import Client
+from pyrogram.types import Message
+from i18n import _
 
 bot = Client("my_bot")
 
@@ -175,6 +166,5 @@ async def start(__, msg: Message):
 
 
 if __name__ == "__main__":
-    bot.loop.run_until_complete(i18n.build_async())
     bot.run()
 ```
