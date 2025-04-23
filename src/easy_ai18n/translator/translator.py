@@ -75,7 +75,9 @@ class OpenAITranslator(BaseItemTranslator, BaseOpenAITranslator):
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=build_messages(self.prompt, target_lang, text),
+                messages=build_messages(
+                    self.prompt, f"Translate the text to {target_lang}:\n{text}"
+                ),
                 temperature=0,
             )
         except Exception as e:
@@ -85,8 +87,8 @@ class OpenAITranslator(BaseItemTranslator, BaseOpenAITranslator):
 
 
 class TranslatorResult(BaseModel):
-    key: str = Field(..., description="key")
-    value: str = Field(..., description="value")
+    key: str = Field(..., description="12 YAML key")
+    value: str = Field(..., description="Translation results")
 
 
 class OpenAIYAMLTranslator(BaseBulkTranslator, BaseOpenAITranslator):
@@ -125,11 +127,14 @@ class OpenAIYAMLTranslator(BaseBulkTranslator, BaseOpenAITranslator):
             batch = dict(items[i : i + self.batch_size])
             try:
                 text = yaml.dump(
-                    batch, allow_unicode=True, canonical=True
-                )  # 使用canonical规范格式, 避免换行影响结果
+                    batch, allow_unicode=True, canonical=True, width=100000
+                )  # 使用canonical规范格式, 加大文本长度, 避免换行影响结果
                 response = await self.client.chat.completions.create(
                     model=self.model,
-                    messages=build_messages(self.prompt, target_lang, text),
+                    messages=build_messages(
+                        self.prompt,
+                        f"Translate this YAML content in planning format to {target_lang}:\n{text}",
+                    ),
                     response_model=List[TranslatorResult],
                     max_retries=3,
                     temperature=0,

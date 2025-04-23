@@ -1,4 +1,4 @@
-def build_messages(prompt, target_lang, text) -> list:
+def build_messages(prompt, content) -> list:
     return [
         {
             "role": "system",
@@ -6,6 +6,6 @@ def build_messages(prompt, target_lang, text) -> list:
         },
         {
             "role": "user",
-            "content": f"Translate the text to {target_lang}:\n{text}",
+            "content": content,
         },
     ]
