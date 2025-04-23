@@ -291,7 +291,7 @@ class ASTParser:
         self,
         *,
         frame: FrameType = None,
-        call_nodes: ast.Call = None,
+        call_nodes: list[ast.Call] = None,
     ) -> StringData | None:
         """
         解析第一个匹配的调用节点，并返回构造后的字符串及变量数据。
