@@ -1,0 +1,58 @@
+06f835da3647: '{value!s}'
+0accbed5e8bb: 'Amsterdam, Netherlands 🇳🇳
+
+  🌏`149.154.167.91`'
+13d54d69fb21: '{number:b}'
+14278ac95892: '{num:*>5}'
+3cb38de5e9bc: 'vscode is a young and ignorant girl. You have to teach her to learn,
+  train her, and make her the most suitable for you.
+
+  Idea is an intellectual and sensible sister who can help you do all the work'
+3cd5b75ef5b2: 'Miami, Florida, USA 🇺🇸
+
+  🌏`149.154.175.53`'
+3fdf7aa7b711: '{text:<10}'
+4039593cca99: '{value:0>10.2f}'
+47667c2000e2: '{text:^10}'
+499eafd94419: List Test
+4a0d36deb07a: '{value!r}'
+550245633fe7: '{text:>10}'
+583c4f377343: Hello World
+5cc955f15844: '{1 + 2:03d}'
+5d41402abc4b: hello
+644a3d8dcef2: '{number:08d}'
+65ac2aad3644: Hello World
+67d7061bb552: '{value!r:>10}'
+695ef5074fd6: '{None}'
+69b60b827816: '{num:0>5}'
+6bc5682b31cc: '{number:{width}.{precision}f}'
+7d793037a076: world
+86a90ba9edbf: '{number:o}'
+8b02102067f1: Hello, world {a}, {b}
+97d9c387e4b2: '{empty:>5}'
+a2a579f31f7e: 'Miami, Florida, USA 🇺🇸
+
+  🌏`149.154.175.100`'
+a547f8e96eaa: vscode is a young and ignorant girl. You have to teach her to learn,
+  train her, and make her the most suitable for you. Idea is an intellectual and sensible
+  sister. She can help you do all the work.
+a729f82d981f: '{number:.2f}'
+c9697cdfd0f8: Hello-{b}
+cadf60b0e5f3: '{vscode} is a young and ignorant girl. You have to teach her to learn,
+  train her, and make her the most suitable for you.
+
+  {idea} is an intellectual and sensible sister who can help you do all the work'
+cc643b20d35b: '{value!a}'
+d5e765bc27c3: 'Number: {one}'
+d9bb720a8a21: '{len(''hello''):02d}'
+e02c3470f431: 'Amsterdam, Netherlands 🇳🇳
+
+  🌏`149.154.167.51`'
+e4f293ab0cd5: '{1 + 1}'
+e5029cfcdd46: '{number:10.2f}'
+ed4b9fb513b0: '{number:010.2f}'
+ed56c56f4d7a: '{ratio:.1%}'
+f8b975dc55a6: 'Singapore 🇸🇬
+
+  🌏`91.108.56.130`'
+f960b22d3ea4: '{number:x}'
