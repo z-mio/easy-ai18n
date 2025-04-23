@@ -1,8 +1,13 @@
 [project]
 name = "easy-ai18n"
-version = "0.0.5"
+version = "0.0.6"
 description = "Simple and Elegant Python3 Internationalization (i18n) Tool"
 requires-python = ">=3.12"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "梓澪", email = "zilingmio@gmail.com" }
+]
 dependencies = [
     "aioresult==1.2",
     "anyio>=4.9.0",
@@ -16,6 +21,11 @@ dependencies = [
     "tenacity==9.1.2",
     "tqdm>=4.67.1",
 ]
+
 [project.urls]
 Repository = "https://github.com/z-mio/easy-ai18n"
 Issues = "https://github.com/z-mio/easy-ai18n/issues"
+
+# https://github.com/astral-sh/uv/issues/9513#issuecomment-2519527822
+[tool.setuptools]
+license-files = []
