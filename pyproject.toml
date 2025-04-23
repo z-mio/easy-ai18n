@@ -1,6 +1,6 @@
 [project]
 name = "easy-ai18n"
-version = "0.0.6"
+version = "0.0.8"
 description = "Simple and Elegant Python3 Internationalization (i18n) Tool"
 requires-python = ">=3.12"
 readme = "README.md"
