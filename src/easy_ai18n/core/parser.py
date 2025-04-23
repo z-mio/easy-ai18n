@@ -56,9 +56,9 @@ class StringConstructor:
     根据传入的 AST 节点构造字符串，同时处理 f-string 表达式。
     """
 
-    def __init__(self, sep: str, i18n_function_name: list[str]):
+    def __init__(self, sep: str, i18n_function_names: list[str]):
         self.sep = sep
-        self.i18n_function_name = i18n_function_name
+        self.i18n_function_names = i18n_function_names
 
     def construct_from_node(
         self, call_node: ast.Call, evaluator: "VariableEvaluator" = None
@@ -85,7 +85,7 @@ class StringConstructor:
                 else:
                     # 将其他表达式包装为 f-string
                     expr_src = ast.unparse(arg)  # type: ignore
-                    wrapper = f'{self.i18n_function_name[0]}(f"{{{expr_src}}}")'
+                    wrapper = f'{self.i18n_function_names[0]}(f"{{{expr_src}}}")'
                     wrapper_call: ast.Call = ast.parse(wrapper).body[0].value  # type: ignore
                     part, found = self._handle_f_string(wrapper_call.args[0], evaluator)  # type: ignore
 
@@ -236,9 +236,9 @@ class VariableEvaluator:
 
 
 class ASTParser:
-    """
-    通过组合 ASTWalker、StringConstructor 和 VariableEvaluator，对指定的 AST 节点进行解析。
-    """
+    def __init__(self, sep: str, i18n_function_names: list[str]):
+        self.sep = sep
+        self.i18n_function_names = i18n_function_names
 
     @staticmethod
     def get_code_block(frame: FrameType):
@@ -274,30 +274,24 @@ class ASTParser:
         result.append(lines[end_line].encode()[: positions.end_col_offset].decode())
         return "".join(result)
 
-    def extract_all_strings(
-        self, *, node: ast.AST, sep: str, i18n_function_name: list[str]
-    ) -> list[str]:
+    def extract_all(self, *, node: ast.AST) -> list[str]:
         """
         仅提取解析后的字符串，默认只解析第一个匹配的调用节点。
         """
-        target_nodes = ASTWalker(i18n_function_name).get_target_nodes(node)
+        target_nodes = ASTWalker(self.i18n_function_names).get_target_nodes(node)
 
         if not target_nodes:
             return []
         strings, _ = self._extract(
             target_nodes=target_nodes,
-            sep=sep,
-            i18n_function_name=i18n_function_name,
         )
         return strings
 
-    def extract_string_data(
+    def extract(
         self,
         *,
-        i18n_function_name: list[str],
-        sep: str = None,
         frame: FrameType = None,
-        call_nodes: list[ast.Call] = None,
+        call_nodes: ast.Call = None,
     ) -> StringData | None:
         """
         解析第一个匹配的调用节点，并返回构造后的字符串及变量数据。
@@ -308,26 +302,21 @@ class ASTParser:
         else:
             call_text = self.get_code_block(frame)
             node = ast.parse(call_text.strip())
-            target_nodes = ASTWalker(i18n_function_name).get_target_nodes(node)
-
+            target_nodes = ASTWalker(self.i18n_function_names).get_target_nodes(node)
         if not target_nodes:
             return None
 
         strings, variables_collected = self._extract(
-            i18n_function_name=i18n_function_name,
             target_nodes=target_nodes[:1],
-            sep=sep,
             get_variables_value=True,
             frame=frame,
         )
         return StringData(strings[0], variables_collected, target_nodes[:1])
 
-    @staticmethod
     def _extract(
+        self,
         *,
         target_nodes: list[ast.Call],
-        sep: str,
-        i18n_function_name: list[str],
         get_variables_value: bool = False,
         frame: FrameType = None,
     ) -> tuple[list[str], dict]:
@@ -337,7 +326,9 @@ class ASTParser:
         if get_variables_value and frame:
             evaluator = VariableEvaluator(frame.f_globals, frame.f_locals)
 
-        string_constructor = StringConstructor(sep, i18n_function_name)
+        string_constructor = StringConstructor(
+            sep=self.sep, i18n_function_names=self.i18n_function_names
+        )
         strings_set = set()
 
         for call_node in target_nodes:

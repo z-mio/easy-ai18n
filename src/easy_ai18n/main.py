@@ -16,20 +16,20 @@ from .translator import BaseItemTranslator, BaseBulkTranslator
 class EasyAI18n:
     def __init__(
         self,
-        func_name: str | list[str] = None,
+        i18n_function_names: str | list[str] = None,
         sep: str = None,
         i18n_file_dir: str | Path = None,
     ):
         """
         初始化EasyAI18n实例。
-        :param func_name: 翻译函数的名称
+        :param i18n_function_names: 翻译函数的名称
         :param sep: 分隔符, 默认为空格
         :param i18n_file_dir: 翻译文件存放的目录
         """
+        self.i18n_function_names = i18n_function_names or ic.i18n_function_names
+        self.sep = sep or ic.def_sep
         self.i18n_file_dir = Path(i18n_file_dir) if i18n_file_dir else ic.i18n_dir
         self.i18n_file_dir.mkdir(parents=True, exist_ok=True)
-        self.func_name = func_name or ic.i18n_function_name
-        self.sep = sep or ic.def_sep
 
     def build(
         self,
@@ -86,7 +86,7 @@ class EasyAI18n:
         """
         builder = Builder(
             target_lang=target_lang,
-            i18n_function_name=self.func_name,
+            i18n_function_names=self.i18n_function_names,
             sep=self.sep,
             project_dir=project_dir,
             i18n_file_dir=self.i18n_file_dir,
@@ -118,7 +118,7 @@ class EasyAI18n:
             languages=languages,
             sep=self.sep,
             i18n_file_dir=self.i18n_file_dir,
-            i18n_function_name=self.func_name,
+            i18n_function_names=self.i18n_function_names,
             pre_lang_selector=pre_lang_selector,
             post_lang_selector=post_lang_selector,
         )

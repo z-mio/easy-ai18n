@@ -27,7 +27,7 @@ class Builder:
         self,
         target_lang: str | list[str] = "en",
         sep: str = None,
-        i18n_function_name: str | list[str] = None,
+        i18n_function_names: str | list[str] = None,
         project_dir: str = None,
         i18n_file_dir: str | Path = None,
         include: list[str] = None,
@@ -40,7 +40,7 @@ class Builder:
         初始化Builder
         :param target_lang: 目标语言
         :param sep: 分隔符
-        :param i18n_function_name: 翻译函数名
+        :param i18n_function_names: 翻译函数名
         :param project_dir: 需要翻译的项目的根目录
         :param i18n_file_dir: 翻译文件目录
         :param include: 包含的文件或目录
@@ -53,7 +53,9 @@ class Builder:
         self.include = include or []
         self.exclude = exclude or []
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
-        self.i18n_function_name = to_list(i18n_function_name) or ic.def_i18n_func_name
+        self.i18n_function_names = (
+            to_list(i18n_function_names) or ic.i18n_function_names
+        )
         self.sep = sep or ic.def_sep
         self.target_lang = to_list(target_lang)
         self.i18n_file_dir = to_path(i18n_file_dir) or ic.i18n_dir
@@ -284,9 +286,9 @@ class Builder:
         :return:
         """
         module = ast.parse(file.read_text(encoding="utf-8"))
-        return ASTParser().extract_all_strings(
-            node=module, sep=self.sep, i18n_function_name=self.i18n_function_name
-        )
+        return ASTParser(
+            sep=self.sep, i18n_function_names=self.i18n_function_names
+        ).extract_all(node=module)
 
     def load_i18n_file(self) -> dict:
         """

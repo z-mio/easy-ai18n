@@ -1,5 +1,5 @@
 """
-翻译函数调用时
+翻译函数, 语言选择器
 """
 
 import abc
@@ -132,17 +132,15 @@ class PostLanguageSelector(abc.ABC):
 
     def format(self, lang: str | None = None) -> str:
         """格式化字符串并应用翻译"""
-        try:
-            if not lang:
-                return self._format(self.text)
-            translated = self.get_by_text(self.text, lang)
-            return self._format(translated)
-        except Exception as e:
-            logger.error(f"后置语言选择器错误: {e}")
-            return self.text
+        if not lang:
+            return self._format(self.text)
+        translated = self.get_by_text(self.text, lang)
+        return self._format(translated)
 
     def _format(self, raw_string) -> str:
         for v in self.variables:
+            if isinstance(self.variables[v], Exception):
+                raise self.variables[v]
             raw_string = raw_string.replace(v, str(self.variables[v]))
         return raw_string
 
@@ -157,7 +155,7 @@ class I18n:
         global_lang: str = None,
         sep: str = None,
         i18n_file_dir: str | Path = None,
-        i18n_function_name: str | list[str] = None,
+        i18n_function_names: str | list[str] = None,
         pre_lang_selector: Type[PreLanguageSelector] | None = None,
         post_lang_selector: Type[PostLanguageSelector] | None = None,
     ):
@@ -166,6 +164,7 @@ class I18n:
         :param languages: 要启用的语言
         :param global_lang: 全局默认使用的语言
         :param sep: 字符串分隔符
+        :param i18n_function_names: 翻译函数名
         :param pre_lang_selector: 前置语言选择器类
         :param post_lang_selector: 后置语言选择器类
         """
@@ -179,7 +178,9 @@ class I18n:
 
         self.sep = sep or ic.def_sep
         self.i18n_file_dir = i18n_file_dir or ic.i18n_dir
-        self.i18n_function_name = to_list(i18n_function_name) or ic.i18n_function_name
+        self.i18n_function_names = (
+            to_list(i18n_function_names) or ic.i18n_function_names
+        )
         self.pre_lang_selector = pre_lang_selector or PreLanguageSelector
         self.post_lang_selector = post_lang_selector or PostLanguageSelector
         self.content = I18nContent
@@ -223,19 +224,16 @@ class I18n:
         call_nodes = self._cache.get(cache_key, None)
 
         try:
-            result = ASTParser().extract_string_data(
-                frame=f,
-                sep=sep,
-                call_nodes=call_nodes,
-                i18n_function_name=self.i18n_function_name,
-            )
+            result = ASTParser(
+                sep=sep, i18n_function_names=self.i18n_function_names
+            ).extract(frame=f, call_nodes=call_nodes)
             return self._handle_cache(original, cache_key, result)
         except Exception as e:
             logger.warning(f"I18N未知错误: {str(e)}")
+            self._parse_failures.add(cache_key)
             return self.content(
                 text=original,
                 i18n_dict=self.i18n_dict,
-                lang=self.global_lang,
                 post_lang_selector=self.post_lang_selector,
             )
         finally:
