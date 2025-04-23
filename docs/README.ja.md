@@ -6,7 +6,11 @@
 
 **シンプルでエレガントな Python3 国際化 (i18n) ツール**
 
+[![Python](https://img.shields.io/badge/python-3.12+-yellow)](https://www.python.org/)
+[![GitHub stars](https://img.shields.io/github/stars/z-mio/easy-ai18n.svg?style=social&label=Stars)](https://github.com/z-mio/easy-ai18n)
+[![GitHub forks](https://img.shields.io/github/forks/z-mio/easy-ai18n.svg?style=social&label=Forks)](https://github.com/z-mio/easy-ai18n)
 [![PyPI version](https://badge.fury.io/py/easy-ai18n.svg)](https://badge.fury.io/py/easy-ai18n)
+[![GitHub License](https://img.shields.io/github/license/z-mio/easy-ai18n)](https://github.com/z-mio/easy-ai18n/blob/master/LICENSE)
 
 [English](https://github.com/z-mio/easy-ai18n) | [中文](./README.zh.md) | 日本語
 
