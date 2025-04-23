@@ -1,6 +1,8 @@
 <div align="center">
 
-<img src="image/logo.png" width="100" >
+<a href="https://github.com/z-mio/easy-ai18n">
+    <img src="image/logo.png" width="100" alt="icon">
+</a>
 
 **シンプルでエレガントな Python3 国際化 (i18n) ツール**
 
