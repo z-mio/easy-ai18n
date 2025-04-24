@@ -5,8 +5,8 @@ AST 解析器
 
 import ast
 import inspect
-import linecache
 from dataclasses import dataclass
+from functools import lru_cache
 from types import FrameType
 
 from ..error import FormatError, EvaluateError
@@ -241,38 +241,33 @@ class ASTParser:
         self.i18n_function_names = i18n_function_names
 
     @staticmethod
-    def get_code_block(frame: FrameType):
-        """
-        获取调用位置的代码块
-        :param frame:
-        :return:
-        """
-        positions = inspect.getframeinfo(frame).positions
+    @lru_cache(maxsize=None)
+    def _read_file_bytes(filename: str) -> list[bytes]:
+        """按行读取并缓存源文件的字节内容"""
+        with open(filename, "rb") as f:
+            return f.read().splitlines(keepends=True)
+
+    def get_code_block(self, frame: FrameType) -> str:
+        # 1. 获取位置属性，跳过上下文行
+        info = inspect.getframeinfo(frame, context=0).positions
         filename = frame.f_code.co_filename
-        lines = linecache.getlines(filename)
+        lineno = info.lineno - 1
+        end_lineno = info.end_lineno - 1
+        col_start = info.col_offset
+        col_end = info.end_col_offset
 
-        start_line = positions.lineno - 1
-        end_line = positions.end_lineno - 1
-        # 如果是单行
-        if start_line == end_line:
-            return (
-                lines[start_line]
-                .encode()[positions.col_offset : positions.end_col_offset]
-                .decode()
-            )
+        # 2. 按字节读取并缓存
+        lines_bytes = self._read_file_bytes(filename)
 
-        # 如果是多行
+        # 3. 单行 vs 多行
+        if lineno == end_lineno:
+            return lines_bytes[lineno][col_start:col_end].decode("utf-8")
 
-        # 处理第一行
-        result = [lines[start_line].encode()[positions.col_offset :].decode()]
-
-        # 处理中间行
-        for i in range(start_line + 1, end_line):
-            result.append(lines[i])
-
-        # 处理最后一行
-        result.append(lines[end_line].encode()[: positions.end_col_offset].decode())
-        return "".join(result)
+        # 4. 多行拼接与分段解码
+        parts = [lines_bytes[lineno][col_start:]]
+        parts.extend(lines_bytes[lineno + 1 : end_lineno])
+        parts.append(lines_bytes[end_lineno][:col_end])
+        return "".join(segment.decode("utf-8") for segment in parts)
 
     def extract_all(self, *, node: ast.AST) -> list[str]:
         """
