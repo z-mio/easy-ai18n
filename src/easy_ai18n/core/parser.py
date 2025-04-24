@@ -248,7 +248,7 @@ class ASTParser:
             return f.read().splitlines(keepends=True)
 
     def get_code_block(self, frame: FrameType) -> str:
-        # 1. 获取位置属性，跳过上下文行
+        # 获取位置属性，跳过上下文行
         info = inspect.getframeinfo(frame, context=0).positions
         filename = frame.f_code.co_filename
         lineno = info.lineno - 1
@@ -256,14 +256,14 @@ class ASTParser:
         col_start = info.col_offset
         col_end = info.end_col_offset
 
-        # 2. 按字节读取并缓存
+        # 按字节读取并缓存
         lines_bytes = self._read_file_bytes(filename)
 
-        # 3. 单行 vs 多行
+        # 单行 vs 多行
         if lineno == end_lineno:
             return lines_bytes[lineno][col_start:col_end].decode("utf-8")
 
-        # 4. 多行拼接与分段解码
+        # 多行拼接与分段解码
         parts = [lines_bytes[lineno][col_start:]]
         parts.extend(lines_bytes[lineno + 1 : end_lineno])
         parts.append(lines_bytes[end_lineno][:col_end])
