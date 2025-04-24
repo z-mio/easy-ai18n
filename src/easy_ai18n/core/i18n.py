@@ -229,7 +229,7 @@ class I18n:
             ).extract(frame=f, call_nodes=call_nodes)
             return self._handle_cache(original, cache_key, result)
         except Exception as e:
-            logger.warning(f"I18N未知错误: {str(e)}")
+            logger.warning(f"I18N解析错误: {str(e)}")
             self._parse_failures.add(cache_key)
             return self.content(
                 text=original,
