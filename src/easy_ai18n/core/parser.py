@@ -286,7 +286,7 @@ class ASTParser:
         if not target_nodes:
             return []
 
-        ressults = []
+        results = []
         string_constructor = StringConstructor(
             sep=self.sep, i18n_function_names=self.i18n_function_names
         )
@@ -294,8 +294,8 @@ class ASTParser:
             constructed, vars_found = string_constructor.construct_from_node(
                 call_node, None
             )
-            ressults.append(StringData(constructed, vars_found, call_node))
-        return ressults
+            results.append(StringData(constructed, vars_found, call_node))
+        return results
 
     def extract(
         self,
@@ -324,4 +324,3 @@ class ASTParser:
             VariableEvaluator(frame.f_globals, frame.f_locals) if frame else None,
         )
         return StringData(constructed, vars_found, call_node)
-
