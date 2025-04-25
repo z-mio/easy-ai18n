@@ -7,7 +7,7 @@ class Loader:
     def __init__(self, i18n_file_dir: str | Path):
         self.i18n_file_dir = i18n_file_dir
 
-    def load_i18n_file(self, lang: str | list[str] = None) -> dict:
+    def load_i18n_file(self, lang: str | list[str] = None) -> dict[str, dict]:
         """
         加载i18n目录下的yaml文件
         :return: i18n字典

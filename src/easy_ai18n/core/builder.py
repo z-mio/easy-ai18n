@@ -12,7 +12,7 @@ import yaml
 from aioresult import ResultCapture, TaskFailedException
 from tqdm import tqdm
 from .loader import Loader
-from .parser import ASTParser
+from .parser import ASTParser, StringData
 from ..config import ic
 from ..translator import GoogleTranslator, BaseItemTranslator, BaseBulkTranslator
 from ..log import logger
@@ -82,35 +82,58 @@ class Builder:
         :return:
         """
         updated_i18n_dict, to_be_translated = self.check_chage()
-        for lang, str_set in to_be_translated.items():
+
+        for lang, sd_list in to_be_translated.items():
             try:
-                i18n_dict = await self.translate(list(str_set), lang)
+                text_id_dict = {gen_id(sd.string): sd for sd in sd_list}  # 原文id字典
+                # 变量替换
+                str_list = {}
+                for k, sd in text_id_dict.items():
+                    if sd.variables:
+                        text = sd.string
+                        for i, var in enumerate(sd.variables.keys()):
+                            text = text.replace(var, f"{{{{{i}}}}}")
+                        str_list[k] = text
+                    else:
+                        str_list[k] = sd.string
+                # 翻译
+                trans_result = await self.translate(str_list, lang)
+
+                # 还原变量
+                for k, sd in text_id_dict.items():
+                    if sd.variables:
+                        text = trans_result[k]
+                        for i, var in enumerate(sd.variables.keys()):
+                            text = text.replace(f"{{{{{i}}}}}", var)
+                        trans_result[k] = text
             except Exception:
                 logger.exception(f"翻译到 {lang} 失败:")
             else:
                 updated_i18n_dict.setdefault(lang, {})
-                updated_i18n_dict[lang] |= i18n_dict
+                updated_i18n_dict[lang] |= trans_result
 
         if save_to_file:
             for lang in updated_i18n_dict:
                 self.save_to_yaml(updated_i18n_dict[lang], lang)
         return True
 
-    def check_chage(self, log: bool = True) -> tuple[dict, dict]:
+    def check_chage(
+        self, log: bool = True
+    ) -> tuple[dict[str, dict], dict[str, list[StringData]]]:
         """
         检查差异
         :return: 移除过期翻译后的字典, 新增内容字典
         """
         lg = logger.debug if log else lambda x: None
-        str_id_dict = {}
+        str_id_dict: dict[str, StringData] = {}
         for file in self.project_files:
-            for text in self.extract_strings(file):
-                if not text:
+            for sd in self.extract_strings(file):
+                if not sd.string:  # 跳过空字符串 _("")
                     continue
-                str_id_dict[gen_id(text)] = text
+                str_id_dict[gen_id(sd.string)] = sd
 
         updated_i18n_dict = copy.deepcopy(self._i18n_dict)
-        to_be_translated: dict[str, set[str]] = {}
+        to_be_translated: dict[str, list[StringData]] = {}
         # 添加新语言
         for lang in self.target_lang:
             if lang not in updated_i18n_dict:
@@ -124,13 +147,17 @@ class Builder:
                     lg(f"过期语言: {lang}")
         updated_i18n_id_dict = self.i18n_dict_to_id_dict(updated_i18n_dict)
         # 添加新翻译
-        for trans_id, orig_text in str_id_dict.items():
+        for trans_id, sd in str_id_dict.items():
             for lang in updated_i18n_dict:
                 if trans_id in updated_i18n_dict[lang]:
                     continue
-                to_be_translated.setdefault(lang, set()).add(orig_text)
+
+                to_be_translated.setdefault(lang, [])
+                if sd.string not in to_be_translated[lang]:
+                    to_be_translated[lang].append(sd)
+
                 lg(
-                    f"新内容: {lang} - {f'{orig_text[:30]}...' if orig_text[30:] else orig_text}"
+                    f"新内容: {lang} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}"
                 )
         # 移除过期翻译
         for lang in updated_i18n_id_dict:
@@ -188,16 +215,16 @@ class Builder:
         return False
 
     async def item_translate(
-        self, text_list: list[str], target_lang: str = None
+        self, text_id_dict: dict[str, str], target_lang: str = None
     ) -> dict[str, str]:
         """
         逐条翻译
-        :param text_list: 待翻译的字符串列表
+        :param text_id_dict: 待翻译的字符串列表
         :param target_lang: 目标语言
         :return: 翻译后的字典 {lang: {id: translated_text}}
         """
         result = {}
-        pbar = self.pbar(target_lang, len(text_list))
+        pbar = self.pbar(target_lang, len(text_id_dict))
 
         async def _fn(text_, lang_, semaphore_):
             async with semaphore_:
@@ -209,7 +236,7 @@ class Builder:
         semaphore = anyio.Semaphore(self.max_concurrent)
         async with anyio.create_task_group() as tg:
             results = {
-                text: ResultCapture.start_soon(
+                (k, text): ResultCapture.start_soon(
                     tg,  # type: ignore
                     _fn,
                     text,
@@ -217,7 +244,7 @@ class Builder:
                     semaphore,
                     suppress_exception=True,
                 )
-                for text in text_list
+                for k, text in text_id_dict.items()
             }
         pbar.close()
         for i, r in results.items():
@@ -225,21 +252,20 @@ class Builder:
             try:
                 r.result()
             except TaskFailedException:
-                logger.exception(f"→ [{target_lang}]翻译失败内容: {i} | 错误详情:")
+                logger.exception(f"→ [{target_lang}]翻译失败内容: {i[1]} | 错误详情:")
             else:
-                result[gen_id(i)] = r.result()
+                result[i[0]] = r.result()
         return result
 
     async def bulk_translation(
-        self, text_list: list[str], target_lang: str = None
+        self, text_id_dict: dict[str, str], target_lang: str = None
     ) -> dict[str, str]:
         """
         整体翻译
-        :param text_list:
+        :param text_id_dict:
         :param target_lang:
         :return:
         """
-        text_id_dict = {gen_id(text): text for text in text_list}
         with self.pbar(target_lang, 1) as pbar:
             all_results = {}
             items = list(text_id_dict.items())
@@ -251,7 +277,7 @@ class Builder:
         return all_results
 
     async def translate(
-        self, text_list: list[str], target_lang: str = None
+        self, text_list: dict[str, str], target_lang: str = None
     ) -> dict[str, str]:
         if isinstance(self.translator, BaseItemTranslator):
             return await self.item_translate(text_list, target_lang)
@@ -260,7 +286,7 @@ class Builder:
         else:
             raise ValueError("translation_mode 必须是 'item' 或 'bulk'")
 
-    def extract_strings(self, file: Path) -> list[str]:
+    def extract_strings(self, file: Path) -> list[StringData]:
         """
         从文件中提取出所有需要翻译的字符串
         :param file: 文件路径
