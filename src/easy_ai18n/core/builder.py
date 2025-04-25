@@ -277,7 +277,7 @@ class Builder:
         elif isinstance(self.translator, BaseBulkTranslator):
             return await self.bulk_translation(text_list, target_lang)
         else:
-            raise ValueError("translation_mode must be 'item' or 'bulk'")
+            raise ValueError("translation_mode 必须是 'item' 或 'bulk'")
 
     def extract_translatable_strings_by_file(self, file: Path) -> list[str]:
         """

@@ -3,10 +3,10 @@
 """
 
 import os
+from pprint import PrettyPrinter
 from typing import List
 
 import instructor
-import yaml
 from googletrans import Translator as Gt
 from instructor.exceptions import InstructorRetryException
 from openai import AsyncOpenAI
@@ -48,7 +48,7 @@ class BaseOpenAITranslator:
         self.prompt = prompt
 
 
-class OpenAITranslator(BaseItemTranslator, BaseOpenAITranslator):
+class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
     """逐条翻译的OpenAI翻译器"""
 
     def __init__(
@@ -91,7 +91,7 @@ class TranslatorResult(BaseModel):
     value: str = Field(..., description="Translation results")
 
 
-class OpenAIYAMLTranslator(BaseBulkTranslator, BaseOpenAITranslator):
+class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
     """整体翻译的OpenAI翻译器"""
 
     def __init__(
@@ -126,9 +126,7 @@ class OpenAIYAMLTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         for i in range(0, len(items), self.batch_size):
             batch = dict(items[i : i + self.batch_size])
             try:
-                text = yaml.dump(
-                    batch, allow_unicode=True, canonical=True, width=100000
-                )  # 使用canonical规范格式, 加大文本长度, 避免换行影响结果
+                text = PrettyPrinter().pformat(batch)
                 response = await self.client.chat.completions.create(
                     model=self.model,
                     messages=build_messages(
