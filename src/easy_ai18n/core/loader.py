@@ -27,8 +27,8 @@ class Loader:
             return {}
 
         for file in i18n_files:
-            yaml.safe_load(Path(file).read_text(encoding="utf-8"))
-            i18n_dict[file.name.split(".")[0]] = yaml.safe_load(
-                file.read_text(encoding="utf-8")
-            )
+            f = yaml.safe_load(Path(file).read_text(encoding="utf-8"))
+            if not f:
+                continue
+            i18n_dict[file.name.split(".")[0]] = f
         return i18n_dict

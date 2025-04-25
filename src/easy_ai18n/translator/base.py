@@ -10,7 +10,7 @@ class BaseItemTranslator(abc.ABC):
         翻译
         :param text: 要翻译的文本
         :param target_lang: 目标语言
-        :return:
+        :return: 翻译结果
         """
         raise NotImplementedError()
 
@@ -24,6 +24,6 @@ class BaseBulkTranslator(abc.ABC):
         翻译
         :param text_id_dict: 文本id字典, 格式 {"text_id": "text"}
         :param target_lang: 目标语言
-        :return:
+        :return: 译文id字典, 格式 {"text_id": "text"}
         """
         raise NotImplementedError()

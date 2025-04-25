@@ -49,7 +49,7 @@ class BaseOpenAITranslator:
 
 
 class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
-    """逐条翻译的OpenAI翻译器"""
+    """OpenAI翻译器 | 逐条翻译"""
 
     def __init__(
         self,
@@ -87,12 +87,12 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
 
 
 class TranslatorResult(BaseModel):
-    key: str = Field(..., description="12 YAML key")
-    value: str = Field(..., description="Translation results")
+    key: str = Field(..., description="key")
+    value: str = Field(..., description="value")
 
 
 class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
-    """整体翻译的OpenAI翻译器"""
+    """OpenAI翻译器 | 整体翻译"""
 
     def __init__(
         self,
@@ -100,17 +100,14 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         base_url: str = None,
         model: str = "gpt-4o-mini",
         prompt: str = TRANSLATE_PROMPT,
-        batch_size: int = 50,
     ):
         """
         :param api_key: OpenAI API Key
         :param base_url: OpenAI API URL
         :param model: 模型
         :param prompt: 提示词
-        :param batch_size: 每次请求的最大文本数
         """
         BaseOpenAITranslator.__init__(self, api_key, base_url, model, prompt)
-        self.batch_size = batch_size
         self.client = instructor.from_openai(
             AsyncOpenAI(api_key=api_key, base_url=base_url)
         )
@@ -121,29 +118,23 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         :param target_lang: 目标语言
         :return: 合并后的翻译结果字典
         """
-        all_results = {}
-        items = list(text_id_dict.items())
-        for i in range(0, len(items), self.batch_size):
-            batch = dict(items[i : i + self.batch_size])
-            try:
-                text = PrettyPrinter().pformat(batch)
-                response = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=build_messages(
-                        self.prompt,
-                        f"Translate this YAML content in planning format to {target_lang}:\n{text}",
-                    ),
-                    response_model=List[TranslatorResult],
-                    max_retries=3,
-                    temperature=0,
-                )
-            except InstructorRetryException as e:
-                raise TranslationError(
-                    f"OpenAI翻译结果验证错误: {e.messages[-1]['content']}"
-                )
-            except Exception as e:
-                raise TranslationError(f"OpenAI翻译错误: {e}")
-            else:
-                batch_results = {kv.key: kv.value for kv in response}
-                all_results.update(batch_results)
-        return all_results
+        try:
+            text = PrettyPrinter().pformat(text_id_dict)
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=build_messages(
+                    self.prompt,
+                    f"Translate the text to {target_lang}:\n{text}",
+                ),
+                response_model=List[TranslatorResult],
+                max_retries=3,
+                temperature=0,
+            )
+        except InstructorRetryException as e:
+            raise TranslationError(
+                f"OpenAI翻译结果验证错误: {e.messages[-1]['content']}"
+            )
+        except Exception as e:
+            raise TranslationError(f"OpenAI翻译错误: {e}")
+        else:
+            return {kv.key: kv.value for kv in response}
