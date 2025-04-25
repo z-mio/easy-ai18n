@@ -98,7 +98,7 @@ easy_ai18n
 from easy_ai18n import EasyAI18n
 
 i18n = EasyAI18n(
-    func_name=["_t", '_']  # 自定义翻译函数名称
+    i18n_function_names=["_t", '_']  # 自定义翻译函数名称
 )
 
 _t = i18n.t()
@@ -112,9 +112,9 @@ print(_("Hello, world!"))
 
 ```python
 from easy_ai18n import EasyAI18n
-from easy_ai18n.translator import OpenAIYAMLTranslator
+from easy_ai18n.translator import OpenAIBulkTranslator
 
-translator = OpenAIYAMLTranslator(api_key=..., base_url=..., model='gpt-4o-mini')
+translator = OpenAIBulkTranslator(api_key=..., base_url=..., model='gpt-4o-mini')
 
 i18n = EasyAI18n()
 i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
