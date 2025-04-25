@@ -7,7 +7,7 @@ _ = i18n.t()
 
 
 def test_build():
-    i18n.build(target_lang=["en", "ja"])
+    i18n.build(target_lang=["en", "ja"], include=["test_i18n.py"])
     assert i18n.i18n_file_dir.joinpath("en.yaml").exists()
     assert i18n.i18n_file_dir.joinpath("ja.yaml").exists()
 
