@@ -168,7 +168,7 @@ class I18n:
         :param pre_lang_selector: 前置语言选择器类
         :param post_lang_selector: 后置语言选择器类
         """
-        self._cache: dict[str, list[ast.Call]] = {}
+        self._cache: dict[str, ast.Call] = {}
         self._parse_failures: set[str] = set()
 
         self.global_lang = global_lang
@@ -221,12 +221,12 @@ class I18n:
             )
 
         # 获取缓存的节点
-        call_nodes = self._cache.get(cache_key, None)
+        call_node = self._cache.get(cache_key, None)
 
         try:
             result = ASTParser(
                 sep=sep, i18n_function_names=self.i18n_function_names
-            ).extract(frame=f, call_nodes=call_nodes)
+            ).extract(frame=f, call_node=call_node)
             return self._handle_cache(original, cache_key, result)
         except Exception as e:
             logger.warning(f"I18N解析错误: {str(e)}")
@@ -253,7 +253,7 @@ class I18n:
                 post_lang_selector=self.post_lang_selector,
             )
 
-        self._cache[cache_key] = result.call_nodes
+        self._cache[cache_key] = result.call_node
         return self.content(
             text=result.string,
             i18n_dict=self.i18n_dict,

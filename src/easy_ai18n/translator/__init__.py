@@ -1,14 +1,14 @@
 from .translator import (
     GoogleTranslator,
-    OpenAITranslator,
-    OpenAIYAMLTranslator,
+    OpenAIItemTranslator,
+    OpenAIBulkTranslator,
 )
 from .base import BaseItemTranslator, BaseBulkTranslator
 
 __all__ = [
     "GoogleTranslator",
-    "OpenAITranslator",
-    "OpenAIYAMLTranslator",
+    "OpenAIItemTranslator",
+    "OpenAIBulkTranslator",
     "BaseItemTranslator",
     "BaseBulkTranslator",
 ]

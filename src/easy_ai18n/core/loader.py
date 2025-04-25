@@ -7,7 +7,7 @@ class Loader:
     def __init__(self, i18n_file_dir: str | Path):
         self.i18n_file_dir = i18n_file_dir
 
-    def load_i18n_file(self, lang: str | list[str] = None) -> dict:
+    def load_i18n_file(self, lang: str | list[str] = None) -> dict[str, dict]:
         """
         加载i18n目录下的yaml文件
         :return: i18n字典
@@ -27,8 +27,8 @@ class Loader:
             return {}
 
         for file in i18n_files:
-            yaml.safe_load(Path(file).read_text(encoding="utf-8"))
-            i18n_dict[file.name.split(".")[0]] = yaml.safe_load(
-                file.read_text(encoding="utf-8")
-            )
+            f = yaml.safe_load(Path(file).read_text(encoding="utf-8"))
+            if not f:
+                continue
+            i18n_dict[file.name.split(".")[0]] = f
         return i18n_dict

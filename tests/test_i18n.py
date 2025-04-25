@@ -7,7 +7,7 @@ _ = i18n.t()
 
 
 def test_build():
-    i18n.build(target_lang=["en", "ja"])
+    i18n.build(target_lang=["en", "ja"], include=["test_i18n.py"])
     assert i18n.i18n_file_dir.joinpath("en.yaml").exists()
     assert i18n.i18n_file_dir.joinpath("ja.yaml").exists()
 
@@ -88,7 +88,7 @@ idea是知性懂事的姐姐，她能帮你做完所有工作"""
         == "vscode是青春懵懂的少女，你要去教她学习，调教她，让她最适合你, idea是知性懂事的姐姐，她能帮你做完所有工作"
     )
 
-    ## 测试 f-string 各种格式化场景
+    # 测试 f-string 各种格式化场景
     # 1. 数字格式化
     number = 3.14159
     assert str(_(f"{number:.2f}")) == "3.14"

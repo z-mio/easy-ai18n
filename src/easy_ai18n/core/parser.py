@@ -16,7 +16,7 @@ from ..error import FormatError, EvaluateError
 class StringData:
     string: str
     variables: dict
-    call_nodes: list[ast.Call]
+    call_node: ast.Call
 
 
 class ASTWalker:
@@ -98,6 +98,11 @@ class StringConstructor:
     def _handle_f_string(
         self, node: ast.JoinedStr, evaluator: "VariableEvaluator" = None
     ) -> tuple[str, dict]:
+        """
+        :param node:
+        :param evaluator: 为 Noe 则只提取表达式, 不求值
+        :return:
+        """
         parts = []
         variables = {}
         for value in node.values:
@@ -113,8 +118,12 @@ class StringConstructor:
                 expr_ = f"{{{expr}{('!' + conversion) if conversion else ''}{(':' + format_spec) if format_spec else ''}}}"
 
                 parts.append(expr_)
-                if evaluator:
-                    variables[expr_] = evaluator.evaluate(expr, conversion, format_spec)
+
+                variables[expr_] = (
+                    evaluator.evaluate(expr, conversion, format_spec)
+                    if evaluator
+                    else None
+                )
         return "".join(parts), variables
 
     @staticmethod
@@ -269,67 +278,50 @@ class ASTParser:
         parts.append(lines_bytes[end_lineno][:col_end])
         return "".join(segment.decode("utf-8") for segment in parts)
 
-    def extract_all(self, *, node: ast.AST) -> list[str]:
+    def extract_all(self, *, node: ast.AST) -> list[StringData]:
         """
         仅提取解析后的字符串，默认只解析第一个匹配的调用节点。
         """
         target_nodes = ASTWalker(self.i18n_function_names).get_target_nodes(node)
-
         if not target_nodes:
             return []
-        strings, _ = self._extract(
-            target_nodes=target_nodes,
+
+        ressults = []
+        string_constructor = StringConstructor(
+            sep=self.sep, i18n_function_names=self.i18n_function_names
         )
-        return strings
+        for call_node in target_nodes:
+            constructed, vars_found = string_constructor.construct_from_node(
+                call_node, None
+            )
+            ressults.append(StringData(constructed, vars_found, call_node))
+        return ressults
 
     def extract(
         self,
         *,
         frame: FrameType = None,
-        call_nodes: list[ast.Call] = None,
+        call_node: ast.Call = None,
     ) -> StringData | None:
         """
         解析第一个匹配的调用节点，并返回构造后的字符串及变量数据。
         """
         # 节点解析的性能开销大, 尽量使用缓存
-        if call_nodes:
-            target_nodes = call_nodes
-        else:
+        if not call_node:
             call_text = self.get_code_block(frame)
             node = ast.parse(call_text.strip())
             target_nodes = ASTWalker(self.i18n_function_names).get_target_nodes(node)
-        if not target_nodes:
-            return None
-
-        strings, variables_collected = self._extract(
-            target_nodes=target_nodes[:1],
-            get_variables_value=True,
-            frame=frame,
-        )
-        return StringData(strings[0], variables_collected, target_nodes[:1])
-
-    def _extract(
-        self,
-        *,
-        target_nodes: list[ast.Call],
-        get_variables_value: bool = False,
-        frame: FrameType = None,
-    ) -> tuple[list[str], dict]:
-        variables_collected: dict = {}
-
-        evaluator: VariableEvaluator | None = None
-        if get_variables_value and frame:
-            evaluator = VariableEvaluator(frame.f_globals, frame.f_locals)
+            if target_nodes:
+                call_node = target_nodes[0]
+            else:
+                return None
 
         string_constructor = StringConstructor(
             sep=self.sep, i18n_function_names=self.i18n_function_names
         )
-        strings_set = set()
+        constructed, vars_found = string_constructor.construct_from_node(
+            call_node,
+            VariableEvaluator(frame.f_globals, frame.f_locals) if frame else None,
+        )
+        return StringData(constructed, vars_found, call_node)
 
-        for call_node in target_nodes:
-            constructed, vars_found = string_constructor.construct_from_node(
-                call_node, evaluator
-            )
-            strings_set.add(constructed)
-            variables_collected.update(vars_found)
-        return list(strings_set), variables_collected
