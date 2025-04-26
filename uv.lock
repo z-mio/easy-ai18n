@@ -61,19 +61,6 @@ wheels = [
 ]
 
 [[package]]
-name = "aioresult"
-version = "1.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "sniffio" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/85/87/e0e610a43b1f2f3f415b83459bb8f92da0097dcc42b8f99de0aedea9b801/aioresult-1.2.tar.gz", hash = "sha256:627c9f452e851d71635fb1d88ce9c0ad371f112eadd33f1753b2469f645f3003", size = 19894, upload_time = "2025-02-28T14:35:45.253Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/4a/0bd4b115aee22e26c7cc7d2f2075d7be39447cf62e4628bcf13f68c286b0/aioresult-1.2-py3-none-any.whl", hash = "sha256:cc9bb4854885acd6eefdf91ceb5e07e9f7b176039136b1058e9303ed7f1f5223", size = 15071, upload_time = "2025-02-28T14:35:43.938Z" },
-]
-
-[[package]]
 name = "aiosignal"
 version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -202,11 +189,9 @@ wheels = [
 
 [[package]]
 name = "easy-ai18n"
-version = "0.0.10"
+version = "0.0.15"
 source = { virtual = "." }
 dependencies = [
-    { name = "aioresult" },
-    { name = "anyio" },
     { name = "googletrans" },
     { name = "instructor" },
     { name = "loguru" },
@@ -220,17 +205,15 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aioresult", specifier = "==1.2" },
-    { name = "anyio", specifier = ">=4.9.0" },
-    { name = "googletrans", specifier = "==4.0.2" },
-    { name = "instructor", specifier = ">=1.7.9" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "openai", specifier = "==1.75.0" },
-    { name = "pytest", specifier = "==8.3.5" },
-    { name = "python-dotenv", specifier = "==1.1.0" },
-    { name = "pyyaml", specifier = "==6.0.2" },
-    { name = "tenacity", specifier = "==9.1.2" },
-    { name = "tqdm", specifier = ">=4.67.1" },
+    { name = "googletrans", specifier = "~=4.0.2" },
+    { name = "instructor", specifier = "~=1.7.9" },
+    { name = "loguru", specifier = "~=0.7.3" },
+    { name = "openai", specifier = "~=1.75.0" },
+    { name = "pytest", specifier = "~=8.3.5" },
+    { name = "python-dotenv", specifier = "~=1.1.0" },
+    { name = "pyyaml", specifier = "~=6.0.2" },
+    { name = "tenacity", specifier = "~=9.1.2" },
+    { name = "tqdm", specifier = "~=4.67.1" },
 ]
 
 [[package]]

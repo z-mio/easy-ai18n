@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="https://github.com/z-mio/easy-ai18n">
-    <img src="image/logo.png" width="100" alt="icon">
+    <img src="docs/image/logo.png" width="100" alt="icon">
 </a>
 
 **简单、优雅的 Python3 国际化(i18n)工具**
@@ -12,7 +12,7 @@
 [![PyPI version](https://badge.fury.io/py/easy-ai18n.svg)](https://badge.fury.io/py/easy-ai18n)
 [![GitHub License](https://img.shields.io/github/license/z-mio/easy-ai18n)](https://github.com/z-mio/easy-ai18n/blob/master/LICENSE)
 
-[English](https://github.com/z-mio/easy-ai18n) | 中文 | [日本語](./README.ja.md)
+[English](https://github.com/z-mio/easy-ai18n) | 中文 | [日本語](README.ja.md)
 
 </div>
 
@@ -30,11 +30,11 @@ Easy AI18n 是一款现代化的 Python3 国际化工具库，支持 AI 翻译�
 
 ## 🔍 对比其他 i18n 工具
 
-|                      其他 i18n 工具                      |                   EasyAI18n                   |
-|:----------------------------------------------------:|:---------------------------------------------:|
-| ![](image/1.png)<br/>**需手动维护 `key` 与 i18n 文件，开发成本高** |  ![](image/2.png)<br/>**自动提取翻译内容，无需手动维护文件**   |
-|         ![](image/3.png)<br/>**仅支持部分格式化语法**          |     ![](image/4.png)<br/>**完全支持所有格式化语法**      |
-|    ![](image/5.png)<br/>**不支持实时多语言切换，不适用于多用户场景**     | ![](image/6.png)<br/>**支持默认语言与多语言切换，适配多用户环境** |
+|                        其他 i18n 工具                         |                     EasyAI18n                      |
+|:---------------------------------------------------------:|:--------------------------------------------------:|
+| ![](docs/image/1.png)<br/>**需手动维护 `key` 与 i18n 文件，开发成本高** |  ![](docs/image/2.png)<br/>**自动提取翻译内容，无需手动维护文件**   |
+|         ![](docs/image/3.png)<br/>**仅支持部分格式化语法**          |     ![](docs/image/4.png)<br/>**完全支持所有格式化语法**      |
+|    ![](docs/image/5.png)<br/>**不支持实时多语言切换，不适用于多用户场景**     | ![](docs/image/6.png)<br/>**支持默认语言与多语言切换，适配多用户环境** |
 
 ---
 
@@ -122,6 +122,25 @@ i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
 _ = i18n.t()
 
 print(_("Hello, world!")['zh-Hant'])
+```
+
+### 🔎 语言选择器
+
+```python
+from easy_ai18n import EasyAI18n
+
+i18n = EasyAI18n()
+_ = i18n.t()
+_t = _['ja']
+
+d = {
+    1: _('apple'),
+    2: _('banana'),
+    3: _t('orange'),
+}
+print(d[1]['zh-hans'])  # output: 苹果
+print(d[2])  # output: banana
+print(d[3])  # output: みかん
 ```
 
 ### 👥 多用户语言场景（如 Telegram Bot）

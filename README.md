@@ -12,7 +12,7 @@
 [![PyPI version](https://badge.fury.io/py/easy-ai18n.svg)](https://badge.fury.io/py/easy-ai18n)
 [![GitHub License](https://img.shields.io/github/license/z-mio/easy-ai18n)](https://github.com/z-mio/easy-ai18n/blob/master/LICENSE)
 
-English | [中文](docs/README.zh.md) | [日本語](docs/README.ja.md)
+English | [中文](README.zh.md) | [日本語](README.ja.md)
 
 </div>
 
@@ -122,6 +122,25 @@ i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
 _ = i18n.t()
 
 print(_("Hello, world!")['zh-Hant'])
+```
+
+### 🔎 Language Selector
+
+```python
+from easy_ai18n import EasyAI18n
+
+i18n = EasyAI18n()
+_ = i18n.t()
+_t = _['ja']
+
+d = {
+    1: _('apple'),
+    2: _('banana'),
+    3: _t('orange'),
+}
+print(d[1]['zh-hans'])  # output: 苹果
+print(d[2])  # output: banana
+print(d[3])  # output: みかん
 ```
 
 ### 👥 Multi-user Language Scenarios (e.g. Telegram Bot)
