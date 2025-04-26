@@ -99,7 +99,7 @@ class EasyAI18n:
         )
         await builder.run()
 
-    def t(
+    def i18n(
         self,
         global_lang: str = None,
         languages: str | list[str] = None,

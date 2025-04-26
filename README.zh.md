@@ -55,7 +55,7 @@ from easy_ai18n import EasyAI18n
 
 i18n = EasyAI18n()
 
-_ = i18n.t()
+_ = i18n.i18n()
 
 if __name__ == "__main__":
     i18n.build(["ja"])
@@ -101,7 +101,7 @@ i18n = EasyAI18n(
     i18n_function_names=["_t", '_']  # 自定义翻译函数名称
 )
 
-_t = i18n.t()
+_t = i18n.i18n()
 _ = _t
 
 print(_t("Hello, world!"))
@@ -119,7 +119,7 @@ translator = OpenAIBulkTranslator(api_key=..., base_url=..., model='gpt-4o-mini'
 i18n = EasyAI18n()
 i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
 
-_ = i18n.t()
+_ = i18n.i18n()
 
 print(_("Hello, world!")['zh-Hant'])
 ```
@@ -130,7 +130,7 @@ print(_("Hello, world!")['zh-Hant'])
 from easy_ai18n import EasyAI18n
 
 i18n = EasyAI18n()
-_ = i18n.t()
+_ = i18n.i18n()
 _t = _['ja']
 
 d = {
@@ -163,7 +163,7 @@ class MyPostLanguageSelector(PostLanguageSelector):
 
 i18n = EasyAI18n()
 
-_ = i18n.t(post_lang_selector=MyPostLanguageSelector)
+_ = i18n.i18n(post_lang_selector=MyPostLanguageSelector)
 
 if __name__ == "__main__":
     i18n.build(target_lang=['en', 'ru'])

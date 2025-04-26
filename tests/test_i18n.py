@@ -3,7 +3,7 @@ import os
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
 i18n = EasyAI18n()
-_ = i18n.t()
+_ = i18n.i18n()
 
 
 def test_build():
