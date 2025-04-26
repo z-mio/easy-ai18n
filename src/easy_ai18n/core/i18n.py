@@ -226,8 +226,8 @@ class I18n:
                 sep=sep, i18n_function_names=self.i18n_function_names
             ).extract(frame=f, call_node=call_node)
             return self._handle_cache(original, cache_key, result)
-        except Exception as e:
-            logger.warning(f"I18N解析错误: {str(e)}")
+        except Exception:
+            logger.exception("I18N解析错误")
             self._parse_failures.add(cache_key)
             return self.content(
                 text=original,
@@ -244,7 +244,7 @@ class I18n:
         """处理缓存并返回结果"""
         if not result:
             self._parse_failures.add(cache_key)
-            logger.warning(f"I18N解析错误: {original}")
+            logger.exception(f"I18N解析错误: {original}")
             return self.content(
                 text=original,
                 i18n_dict=self.i18n_dict,
