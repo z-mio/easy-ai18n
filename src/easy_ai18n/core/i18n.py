@@ -139,8 +139,6 @@ class PostLanguageSelector(abc.ABC):
 
     def _format(self, raw_string) -> str:
         for v in self.variables:
-            if isinstance(self.variables[v], Exception):
-                raise self.variables[v]
             raw_string = raw_string.replace(v, str(self.variables[v]))
         return raw_string
 

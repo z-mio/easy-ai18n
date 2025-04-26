@@ -192,9 +192,9 @@ class VariableEvaluator:
                 format_spec = self._eval_format_spec(format_spec)
                 return format(value, format_spec)
             except Exception as e:
-                return FormatError(e)
+                raise FormatError(e)
         except Exception as e:
-            return EvaluateError(e)
+            raise EvaluateError(e)
 
     def _evaluate_basic(self, expr: str) -> any:
         """基础求值"""
