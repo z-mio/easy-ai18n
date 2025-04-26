@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Type
 
-import anyio
+import asyncio
 
 from .config import ic
 from .core import (
@@ -52,15 +52,16 @@ class EasyAI18n:
         :param disable_progress_bar: 禁用翻译进度条
         :return:
         """
-        return anyio.run(
-            self.build_async,
-            target_lang,
-            project_dir,
-            include,
-            exclude,
-            translator,
-            max_concurrent,
-            disable_progress_bar,
+        return asyncio.run(
+            self.build_async(
+                target_lang,
+                project_dir,
+                include,
+                exclude,
+                translator,
+                max_concurrent,
+                disable_progress_bar,
+            )
         )
 
     async def build_async(
