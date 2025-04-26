@@ -7,9 +7,8 @@ import os
 from pathlib import Path
 import copy
 
-import anyio
+import asyncio
 import yaml
-from aioresult import ResultCapture, TaskFailedException
 from tqdm import tqdm
 from .loader import Loader
 from .parser import ASTParser, StringData
@@ -219,42 +218,39 @@ class Builder:
     ) -> dict[str, str]:
         """
         逐条翻译
-        :param text_id_dict: 待翻译的字符串列表
+        :param text_id_dict: 待翻译的字符串字典 {id: text}
         :param target_lang: 目标语言
-        :return: 翻译后的字典 {lang: {id: translated_text}}
+        :return: 翻译后的字典 {id: translated_text}
         """
-        result = {}
+        result: dict[str, str] = {}
         pbar = self.pbar(target_lang, len(text_id_dict))
 
-        async def _fn(text_, lang_, semaphore_):
-            async with semaphore_:
-                tr = await self.translator.translate(text_, lang_)
-                pbar.update()
-                return tr
+        semaphore = asyncio.Semaphore(self.max_concurrent)
 
-        # 最大并发数
-        semaphore = anyio.Semaphore(self.max_concurrent)
-        async with anyio.create_task_group() as tg:
-            results = {
-                (k, text): ResultCapture.start_soon(
-                    tg,  # type: ignore
-                    _fn,
-                    text,
-                    target_lang,
-                    semaphore,
-                    suppress_exception=True,
-                )
-                for k, text in text_id_dict.items()
-            }
+        async def _translate_one(text: str, lang: str, sem: asyncio.Semaphore) -> str:
+            async with sem:
+                translated = await self.translator.translate(text, lang)
+                pbar.update()
+                return translated
+
+        tasks: dict[str, asyncio.Task] = {
+            key: asyncio.create_task(_translate_one(text, target_lang, semaphore))
+            for key, text in text_id_dict.items()
+        }
+
+        done, _ = await asyncio.wait(tasks.values())
         pbar.close()
-        for i, r in results.items():
-            r: ResultCapture
+
+        for key, task in tasks.items():
             try:
-                r.result()
-            except TaskFailedException:
-                logger.exception(f"→ [{target_lang}]翻译失败内容: {i[1]} | 错误详情:")
+                translated_text = task.result()
+            except Exception:
+                logger.exception(
+                    f"→ [{target_lang}] 翻译失败 (id={key}, text={text_id_dict[key]}):"
+                )
             else:
-                result[i[0]] = r.result()
+                result[key] = translated_text
+
         return result
 
     async def bulk_translation(
