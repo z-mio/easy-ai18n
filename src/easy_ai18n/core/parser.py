@@ -19,36 +19,30 @@ class StringData:
     call_node: ast.Call
 
 
-class ASTWalker:
-    """
-    遍历 AST 并提取指定函数调用的节点。
-    """
+class CallVisitor(ast.NodeVisitor):
+    def __init__(self, i18n_function_names: list[str]):
+        self.i18n_function_names = i18n_function_names
+        self.nodes: list[ast.Call] = []
 
-    def __init__(self, i18n_function_name: list[str]):
-        self.i18n_function_name = i18n_function_name
-
-    def get_target_nodes(self, node: ast.AST) -> list[ast.Call]:
-        target_nodes = []
-        for item in ast.walk(node):
-            if isinstance(item, ast.Call):
-                # 后置语言选择器 _()[]
-                if (
-                    isinstance(item.func, ast.Name)
-                    and item.func.id in self.i18n_function_name
-                ):
-                    target_nodes.append(item)
-                # 前置语言选择器 _[]()
-                if (
-                    isinstance(item.func, ast.Subscript)
-                    and isinstance(item.func.value, ast.Name)
-                    and item.func.value.id in self.i18n_function_name
-                ):
-                    sub = item.func
-                    target_nodes.append(
-                        ast.Call(func=sub.slice, args=item.args, keywords=item.keywords)
-                    )
-
-        return target_nodes
+    def visit_Call(self, node: ast.Call):
+        func = node.func
+        # 后置选择器：_()
+        if isinstance(func, ast.Name) and func.id in self.i18n_function_names:
+            self.nodes.append(node)
+        # 前置选择器：_[]()
+        elif isinstance(func, ast.Subscript):
+            if (
+                isinstance(func.value, ast.Name)
+                and func.value.id in self.i18n_function_names
+            ):
+                new_call = ast.Call(
+                    func=func.slice,
+                    args=node.args,
+                    keywords=node.keywords,
+                )
+                self.nodes.append(new_call)
+        # 深入其他可能的子节点
+        self.generic_visit(node)
 
 
 class StringConstructor:
@@ -203,7 +197,12 @@ class VariableEvaluator:
             return self.locals.get(expr, self.globals.get(expr, None))
         else:
             # 复杂表达式求值
-            compiled_expr = compile(expr, "<string>", "eval")
+            compiled_expr = compile(
+                expr,
+                "<string>",
+                "eval",
+                # flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT,
+            )
             return eval(compiled_expr, self.globals, self.locals)
 
     @staticmethod
@@ -282,7 +281,7 @@ class ASTParser:
         """
         仅提取解析后的字符串，默认只解析第一个匹配的调用节点。
         """
-        target_nodes = ASTWalker(self.i18n_function_names).get_target_nodes(node)
+        target_nodes = self.get_target_nodes(node)
         if not target_nodes:
             return []
 
@@ -310,7 +309,7 @@ class ASTParser:
         if not call_node:
             call_text = self.get_code_block(frame)
             node = ast.parse(call_text.strip())
-            target_nodes = ASTWalker(self.i18n_function_names).get_target_nodes(node)
+            target_nodes = self.get_target_nodes(node)
             if target_nodes:
                 call_node = target_nodes[0]
             else:
@@ -324,3 +323,8 @@ class ASTParser:
             VariableEvaluator(frame.f_globals, frame.f_locals) if frame else None,
         )
         return StringData(constructed, vars_found, call_node)
+
+    def get_target_nodes(self, node: ast.AST) -> list[ast.Call]:
+        visitor = CallVisitor(self.i18n_function_names)
+        visitor.visit(node)
+        return visitor.nodes
