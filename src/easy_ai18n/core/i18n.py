@@ -207,6 +207,8 @@ class I18n:
         positions = (
             f.f_lineno,
             f.f_lasti,
+            f.f_code.co_name,
+            f.f_code.co_filename,
         )
         cache_key = gen_id(positions)
 
