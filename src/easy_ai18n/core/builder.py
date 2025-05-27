@@ -15,7 +15,7 @@ from .parser import ASTParser, StringData
 from ..config import ic
 from ..translator import GoogleTranslator, BaseItemTranslator, BaseBulkTranslator
 from ..log import logger
-from ..utiles import gen_id, to_list, to_path
+from ..utils import gen_id, to_list, to_path
 
 
 class Builder:

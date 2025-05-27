@@ -12,7 +12,7 @@ from instructor.exceptions import InstructorRetryException
 from openai import AsyncOpenAI
 
 from .base import BaseItemTranslator, BaseBulkTranslator
-from .utiles import build_messages
+from .utils import build_messages
 from ..error import TranslationError
 from ..prompts.translate import TRANSLATE_PROMPT
 from tenacity import retry, stop_after_attempt, wait_fixed

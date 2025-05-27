@@ -14,7 +14,7 @@ from .loader import Loader
 from .parser import ASTParser, StringData
 from ..config import ic
 from ..log import logger
-from ..utiles import gen_id, to_list
+from ..utils import gen_id, to_list
 
 
 class PreLanguageSelector(abc.ABC):
