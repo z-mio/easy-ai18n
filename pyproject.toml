@@ -1,6 +1,6 @@
 [project]
 name = "easy-ai18n"
-version = "1.0.1"
+version = "1.0.2"
 description = "Simple and Elegant Python3 Internationalization (i18n) Tool"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -9,17 +9,19 @@ authors = [
     { name = "梓澪", email = "zilingmio@gmail.com" }
 ]
 dependencies = [
-    "googletrans~=4.0.2",
-    "instructor~=1.7.9",
-    "loguru~=0.7.3",
-    "openai~=1.75.0",
-    "pytest~=8.3.5",
-    "python-dotenv~=1.1.0",
-    "pyyaml~=6.0.2",
-    "tenacity~=9.1.2",
-    "tqdm~=4.67.1",
+    "googletrans",
+    "instructor",
+    "loguru",
+    "openai",
+    "python-dotenv",
+    "pyyaml",
+    "tenacity",
+    "tqdm",
 ]
-
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
 [project.urls]
 Repository = "https://github.com/z-mio/easy-ai18n"
 Issues = "https://github.com/z-mio/easy-ai18n/issues"
