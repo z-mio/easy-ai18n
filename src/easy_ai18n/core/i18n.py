@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     import ast
 
 
-class PreLocaleSelector(abc.ABC):
+class PreLocaleSelector:
     """前置语言选择器"""
 
     def __init__(self, *, i18n: "I18n", sep: str, locale: str = None):
@@ -33,7 +33,6 @@ class PreLocaleSelector(abc.ABC):
     def __repr__(self) -> str:
         return ""
 
-    @abc.abstractmethod
     def __call__(self, *args, sep: str = None) -> str:
         """
         调用后置语言选择器
@@ -102,7 +101,7 @@ class LocaleContent(str):
         return int(self.__str__())
 
 
-class PostLocaleSelector(abc.ABC):
+class PostLocaleSelector:
     """后置语言选择器"""
 
     def __init__(
@@ -129,7 +128,6 @@ class PostLocaleSelector(abc.ABC):
     def __repr__(self) -> str:
         return self.__getitem__(self.locale)
 
-    @abc.abstractmethod
     def __getitem__(self, locale: str | None) -> str:
         """_('内容')[后置语言选择器]"""
         return self.format(locale)
