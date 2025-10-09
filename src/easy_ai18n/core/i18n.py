@@ -23,8 +23,8 @@ class PreLocaleSelector:
 
     def __init__(self, *, i18n: "I18n", sep: str, locale: str = None):
         self.i18n = i18n
-        self.locale = locale
         self.sep = sep
+        self.locale = locale
 
     def __str__(self) -> str:
         return ""
@@ -68,10 +68,10 @@ class LocaleContent(str):
         post_locale_selector: type["PostLocaleSelector"] | None = None,
     ):
         self._text = text
+        self._locales_dict = locales_dict
         self._variables = variables or {}
         self._locale = locale
         self._post_locale_selector = post_locale_selector or PostLocaleSelector
-        self._locales_dict = locales_dict
 
     def __str__(self) -> str:
         return self.__getitem__(self._locale)
@@ -117,9 +117,9 @@ class PostLocaleSelector:
         :param variables: 变量字典，用于替换f-string中的变量
         """
         self.text = text
+        self.locales_dict = locales_dict
         self.variables = variables or {}
         self.locale = locale
-        self.locales_dict = locales_dict
 
     def __str__(self) -> str:
         return self.__getitem__(self.locale)
@@ -138,7 +138,7 @@ class PostLocaleSelector:
         translated = self.get_by_text(self.text, locale)
         return self._format(translated)
 
-    def _format(self, raw_string) -> str:
+    def _format(self, raw_string: str) -> str:
         for v in self.variables:
             raw_string = raw_string.replace(v, str(self.variables[v]))
         return raw_string

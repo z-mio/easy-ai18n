@@ -2,24 +2,20 @@ from pathlib import Path
 
 import yaml
 
-from ..utils import to_list
-
 
 class Loader:
     def __init__(self, locales_dir: str | Path):
         self.locales_dir = locales_dir
 
-    def load_locale_file(self, locales: str | list[str] = None) -> dict[str, dict]:
+    def load_locale_file(self, locales: list[str] = None) -> dict[str, dict]:
         """
         加载 locales 目录下的 yaml 文件
         :return: locales 字典
         """
-        if locales is not None:
-            locales = to_list(locales)
-
         locales_dict = {}
         locale_files = self.locales_dir.glob("**/*.yaml")
-        locale_files = [file for file in locale_files if file.name.split(".")[0] in locales]
+        if locales:
+            locale_files = [file for file in locale_files if file.name.split(".")[0] in locales]
 
         if not locale_files:
             return {}
@@ -29,4 +25,5 @@ class Loader:
             if not f:
                 continue
             locales_dict[file.name.split(".")[0]] = f
+
         return locales_dict
