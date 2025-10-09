@@ -2,6 +2,7 @@
 翻译函数, 语言选择器
 """
 
+import abc
 import inspect
 import sys
 from pathlib import Path
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     import ast
 
 
-class PreLocaleSelector:
+class PreLocaleSelector(abc.ABC):
     """前置语言选择器"""
 
     def __init__(self, *, i18n: "I18n", sep: str, locale: str = None):
@@ -32,6 +33,7 @@ class PreLocaleSelector:
     def __repr__(self) -> str:
         return ""
 
+    @abc.abstractmethod
     def __call__(self, *args, sep: str = None) -> str:
         """
         调用后置语言选择器
@@ -100,7 +102,7 @@ class LocaleContent(str):
         return int(self.__str__())
 
 
-class PostLocaleSelector:
+class PostLocaleSelector(abc.ABC):
     """后置语言选择器"""
 
     def __init__(
@@ -127,9 +129,10 @@ class PostLocaleSelector:
     def __repr__(self) -> str:
         return self.__getitem__(self.locale)
 
-    def __getitem__(self, key: str | None) -> str:
+    @abc.abstractmethod
+    def __getitem__(self, locale: str | None) -> str:
         """_('内容')[后置语言选择器]"""
-        return self.format(key)
+        return self.format(locale)
 
     def format(self, locale: str | None = None) -> str:
         """格式化字符串并应用翻译"""

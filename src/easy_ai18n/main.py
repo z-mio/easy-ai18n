@@ -20,7 +20,7 @@ class EasyAI18n:
         locales_dir: str | Path = None,
     ):
         """
-        初始化EasyAI18n实例。
+        初始化 EasyAI18n 实例。
         :param func_names: 翻译函数的名称
         :param sep: 分隔符, 默认为空格
         :param locales_dir: 语言文件存放目录
