@@ -8,7 +8,7 @@ from typing import List
 
 import instructor
 from googletrans import Translator as Gt
-from instructor.exceptions import InstructorRetryException
+from instructor.core import InstructorRetryException
 from openai import AsyncOpenAI
 
 from .base import BaseItemTranslator, BaseBulkTranslator
@@ -37,14 +37,14 @@ class BaseOpenAITranslator:
         self,
         api_key: str = None,
         base_url: str = None,
-        model: str = "gpt-4o-mini",
+        model: str = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY 未配置")
         self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
-        self.model = model
+        self.model = model or "gpt-5-mini"
         self.prompt = prompt
 
 
@@ -55,7 +55,7 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
         self,
         api_key: str = None,
         base_url: str = None,
-        model: str = "gpt-4o-mini",
+        model: str = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
         """
@@ -98,7 +98,7 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         self,
         api_key: str = None,
         base_url: str = None,
-        model: str = "gpt-4o-mini",
+        model: str = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
         """
