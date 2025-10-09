@@ -186,7 +186,7 @@ class I18n:
         self.content = LocaleContent
         self.locales_dict = Loader(self.locales_dir).load_locale_file(self.enabled_locales)
 
-    def t(self, *args, sep: str = None, frame: FrameType = None) -> LocaleContent:  # type: ignore
+    def t(self, *args, sep: str = None, frame: FrameType = None) -> LocaleContent:
         """
         入口函数
 
