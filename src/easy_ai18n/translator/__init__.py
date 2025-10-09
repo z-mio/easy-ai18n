@@ -1,9 +1,9 @@
+from .base import BaseBulkTranslator, BaseItemTranslator
 from .translator import (
     GoogleTranslator,
-    OpenAIItemTranslator,
     OpenAIBulkTranslator,
+    OpenAIItemTranslator,
 )
-from .base import BaseItemTranslator, BaseBulkTranslator
 
 __all__ = [
     "GoogleTranslator",

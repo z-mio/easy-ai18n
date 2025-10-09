@@ -6,10 +6,10 @@ AST 解析器
 import ast
 import inspect
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import cache
 from types import FrameType
 
-from ..error import FormatError, EvaluateError
+from ..error import EvaluateError, FormatError
 
 
 @dataclass
@@ -20,27 +20,23 @@ class StringData:
 
 
 class CallVisitor(ast.NodeVisitor):
-    def __init__(self, i18n_function_names: list[str]):
-        self.i18n_function_names = i18n_function_names
+    def __init__(self, func_names: list[str]):
+        self.func_names = func_names
         self.nodes: list[ast.Call] = []
 
     def visit_Call(self, node: ast.Call):
         func = node.func
         # 后置选择器：_()
-        if isinstance(func, ast.Name) and func.id in self.i18n_function_names:
+        if isinstance(func, ast.Name) and func.id in self.func_names:
             self.nodes.append(node)
         # 前置选择器：_[]()
-        elif isinstance(func, ast.Subscript):
-            if (
-                isinstance(func.value, ast.Name)
-                and func.value.id in self.i18n_function_names
-            ):
-                new_call = ast.Call(
-                    func=func.slice,
-                    args=node.args,
-                    keywords=node.keywords,
-                )
-                self.nodes.append(new_call)
+        elif isinstance(func, ast.Subscript) and isinstance(func.value, ast.Name) and func.value.id in self.func_names:
+            new_call = ast.Call(
+                func=func.slice,
+                args=node.args,
+                keywords=node.keywords,
+            )
+            self.nodes.append(new_call)
         # 深入其他可能的子节点
         self.generic_visit(node)
 
@@ -54,15 +50,9 @@ class StringConstructor:
         self.sep = sep
         self.i18n_function_names = i18n_function_names
 
-    def construct_from_node(
-        self, call_node: ast.Call, evaluator: "VariableEvaluator" = None
-    ) -> tuple[str, dict]:
+    def construct_from_node(self, call_node: ast.Call, evaluator: "VariableEvaluator" = None) -> tuple[str, dict]:
         sep = next(
-            (
-                kw.value.value
-                for kw in call_node.keywords
-                if kw.arg == "sep" and isinstance(kw.value, ast.Constant)
-            ),
+            (kw.value.value for kw in call_node.keywords if kw.arg == "sep" and isinstance(kw.value, ast.Constant)),
             self.sep,
         )
 
@@ -89,9 +79,7 @@ class StringConstructor:
             return r, variables
         return "", {}
 
-    def _handle_f_string(
-        self, node: ast.JoinedStr, evaluator: "VariableEvaluator" = None
-    ) -> tuple[str, dict]:
+    def _handle_f_string(self, node: ast.JoinedStr, evaluator: "VariableEvaluator" = None) -> tuple[str, dict]:
         """
         :param node:
         :param evaluator: 为 Noe 则只提取表达式, 不求值
@@ -113,11 +101,7 @@ class StringConstructor:
 
                 parts.append(expr_)
 
-                variables[expr_] = (
-                    evaluator.evaluate(expr, conversion, format_spec)
-                    if evaluator
-                    else None
-                )
+                variables[expr_] = evaluator.evaluate(expr, conversion, format_spec) if evaluator else None
         return "".join(parts), variables
 
     @staticmethod
@@ -157,9 +141,7 @@ class VariableEvaluator:
         self.globals = globals_dict
         self.locals = locals_dict
 
-    def evaluate(
-        self, expr: str, conversion: str = None, format_spec: str = None
-    ) -> any:
+    def evaluate(self, expr: str, conversion: str = None, format_spec: str = None) -> any:
         """
         对表达式进行求值
 
@@ -249,7 +231,7 @@ class ASTParser:
         self.i18n_function_names = i18n_function_names
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @cache
     def _read_file_bytes(filename: str) -> list[bytes]:
         """按行读取并缓存源文件的字节内容"""
         with open(filename, "rb") as f:
@@ -286,13 +268,9 @@ class ASTParser:
             return []
 
         results = []
-        string_constructor = StringConstructor(
-            sep=self.sep, i18n_function_names=self.i18n_function_names
-        )
+        string_constructor = StringConstructor(sep=self.sep, i18n_function_names=self.i18n_function_names)
         for call_node in target_nodes:
-            constructed, vars_found = string_constructor.construct_from_node(
-                call_node, None
-            )
+            constructed, vars_found = string_constructor.construct_from_node(call_node, None)
             results.append(StringData(constructed, vars_found, call_node))
         return results
 
@@ -315,9 +293,7 @@ class ASTParser:
             else:
                 return None
 
-        string_constructor = StringConstructor(
-            sep=self.sep, i18n_function_names=self.i18n_function_names
-        )
+        string_constructor = StringConstructor(sep=self.sep, i18n_function_names=self.i18n_function_names)
         constructed, vars_found = string_constructor.construct_from_node(
             call_node,
             VariableEvaluator(frame.f_globals, frame.f_locals) if frame else None,

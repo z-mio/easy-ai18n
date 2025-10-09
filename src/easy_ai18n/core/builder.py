@@ -3,66 +3,65 @@
 """
 
 import ast
+import asyncio
+import copy
 import os
 from pathlib import Path
-import copy
 
-import asyncio
 import yaml
 from tqdm import tqdm
+
+from ..config import ic
+from ..log import logger
+from ..translator import BaseBulkTranslator, BaseItemTranslator, GoogleTranslator
+from ..utils import gen_id, to_path
 from .loader import Loader
 from .parser import ASTParser, StringData
-from ..config import ic
-from ..translator import GoogleTranslator, BaseItemTranslator, BaseBulkTranslator
-from ..log import logger
-from ..utils import gen_id, to_list, to_path
 
 
 class Builder:
     def __init__(
         self,
-        target_lang: str | list[str] = "en",
+        to_lang: list[str] = None,
         sep: str = None,
-        i18n_function_names: str | list[str] = None,
-        project_dir: str = None,
-        i18n_file_dir: str | Path = None,
+        func_names: list[str] = None,
+        project_root: str = None,
+        locales_dir: str | Path = None,
         include: list[str] = None,
         exclude: list[str] = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
-        disable_progress_bar: bool = False,
-        max_concurrent: int = None,
+        show_progress: bool = True,
+        max_concurrency: int = None,
     ):
         """
         初始化Builder
-        :param target_lang: 目标语言
+        :param to_lang: 要翻译到的目标语言
         :param sep: 分隔符
-        :param i18n_function_names: 翻译函数名
-        :param project_dir: 需要翻译的项目的根目录
-        :param i18n_file_dir: 翻译文件目录
+        :param func_names: 翻译函数名
+        :param project_root: 项目根目录
+        :param locales_dir: 语言文件目录
         :param include: 包含的文件或目录
         :param exclude: 排除的文件或目录
         :param translator: 翻译器, 默认为 GoogleTranslator
-        :param disable_progress_bar: 禁用翻译进度条
-        :param max_concurrent: 翻译时的并发数
+        :param show_progress: 是否显示翻译进度条
+        :param max_concurrency: 翻译时的最大并发数
         """
-        self.project_dir = to_path(project_dir) or Path(os.getcwd())
+        self.project_root = to_path(project_root) or Path(os.getcwd())
         self.include = include or []
         self.exclude = exclude or []
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
-        self.i18n_function_names = (
-            to_list(i18n_function_names) or ic.i18n_function_names
-        )
-        self.sep = sep or ic.def_sep
-        self.target_lang = to_list(target_lang)
-        self.i18n_file_dir = to_path(i18n_file_dir) or ic.i18n_dir
+        self.func_names = func_names or ic.func_names
+        self.sep = sep or ic.sep
+        if to_lang is None:
+            raise ValueError("构建失败: to_lang 未配置")
+        self.to_lang = to_lang
+        self.locales_dir = to_path(locales_dir) or ic.locales_dir
         self.translator = translator or GoogleTranslator()
 
         self.project_files = self.load_file()
-        self.disable_progress_bar = disable_progress_bar
-        self.max_concurrent = max_concurrent or (
-            30 if isinstance(self.translator, BaseItemTranslator) else 50
-        )
-        self._i18n_dict = Loader(self.i18n_file_dir).load_i18n_file(self.target_lang)
+        self.show_progress = show_progress
+        self.max_concurrency = max_concurrency or (30 if isinstance(self.translator, BaseItemTranslator) else 50)
+        self._i18n_dict = Loader(self.locales_dir).load_i18n_file(self.to_lang)
 
     async def run(self) -> None:
         if not self.is_changed():
@@ -116,9 +115,7 @@ class Builder:
                 self.save_to_yaml(updated_i18n_dict[lang], lang)
         return True
 
-    def check_chage(
-        self, log: bool = True
-    ) -> tuple[dict[str, dict], dict[str, list[StringData]]]:
+    def check_chage(self, log: bool = True) -> tuple[dict[str, dict], dict[str, list[StringData]]]:
         """
         检查差异
         :return: 移除过期翻译后的字典, 新增内容字典
@@ -134,16 +131,15 @@ class Builder:
         updated_i18n_dict = copy.deepcopy(self._i18n_dict)
         to_be_translated: dict[str, list[StringData]] = {}
         # 添加新语言
-        for lang in self.target_lang:
+        for lang in self.to_lang:
             if lang not in updated_i18n_dict:
                 updated_i18n_dict.setdefault(lang, {})
                 lg(f"新语言: {lang}")
         # 移除过期语言
         for lang in list(self._i18n_dict.keys()):
-            if lang not in self.target_lang:
-                if lang in updated_i18n_dict:
-                    del updated_i18n_dict[lang]
-                    lg(f"过期语言: {lang}")
+            if lang not in self.to_lang and lang in updated_i18n_dict:
+                del updated_i18n_dict[lang]
+                lg(f"过期语言: {lang}")
         updated_i18n_id_dict = self.i18n_dict_to_id_dict(updated_i18n_dict)
         # 添加新翻译
         for trans_id, sd in str_id_dict.items():
@@ -155,9 +151,7 @@ class Builder:
                 if sd.string not in to_be_translated[lang]:
                     to_be_translated[lang].append(sd)
 
-                lg(
-                    f"新内容: {lang} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}"
-                )
+                lg(f"新内容: {lang} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}")
         # 移除过期翻译
         for lang in updated_i18n_id_dict:
             for trans_id in list(updated_i18n_id_dict[lang]):
@@ -174,13 +168,13 @@ class Builder:
         include_paths = [Path(p) for p in self.include] if self.include else []
         exclude_paths = [Path(p) for p in self.exclude]
 
-        for root, dirs, files in self.project_dir.walk():
+        for root, dirs, files in self.project_root.walk():
             # 先做目录排除
             dirs[:] = [
                 d
                 for d in dirs
                 if not any(
-                    (Path(root) / d).relative_to(self.project_dir).match(str(exc))
+                    (Path(root) / d).relative_to(self.project_root).match(str(exc))
                     for exc in self.default_exclude + exclude_paths
                 )
             ]
@@ -189,11 +183,10 @@ class Builder:
                     continue
 
                 full = Path(root) / fname
-                rel = full.relative_to(self.project_dir)
+                rel = full.relative_to(self.project_root)
 
-                if include_paths:
-                    if not any(str(rel).startswith(str(ip)) for ip in include_paths):
-                        continue
+                if include_paths and not any(str(rel).startswith(str(ip)) for ip in include_paths):
+                    continue
 
                 if any(str(rel).startswith(str(ep)) for ep in exclude_paths):
                     continue
@@ -209,23 +202,19 @@ class Builder:
         """
 
         updated_i18n_dict, to_be_translated = self.check_chage(log=False)
-        if updated_i18n_dict != self._i18n_dict or to_be_translated:
-            return True
-        return False
+        return bool(updated_i18n_dict != self._i18n_dict or to_be_translated)
 
-    async def item_translate(
-        self, text_id_dict: dict[str, str], target_lang: str = None
-    ) -> dict[str, str]:
+    async def item_translate(self, text_id_dict: dict[str, str], to_lang: str = None) -> dict[str, str]:
         """
         逐条翻译
         :param text_id_dict: 待翻译的字符串字典 {id: text}
-        :param target_lang: 目标语言
+        :param to_lang: 目标语言
         :return: 翻译后的字典 {id: translated_text}
         """
         result: dict[str, str] = {}
-        pbar = self.pbar(target_lang, len(text_id_dict))
+        pbar = self.pbar(to_lang, len(text_id_dict))
 
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        semaphore = asyncio.Semaphore(self.max_concurrency)
 
         async def _translate_one(text: str, lang: str, sem: asyncio.Semaphore) -> str:
             async with sem:
@@ -234,8 +223,7 @@ class Builder:
                 return translated
 
         tasks: dict[str, asyncio.Task] = {
-            key: asyncio.create_task(_translate_one(text, target_lang, semaphore))
-            for key, text in text_id_dict.items()
+            key: asyncio.create_task(_translate_one(text, to_lang, semaphore)) for key, text in text_id_dict.items()
         }
 
         done, _ = await asyncio.wait(tasks.values())
@@ -245,40 +233,34 @@ class Builder:
             try:
                 translated_text = task.result()
             except Exception:
-                logger.exception(
-                    f"→ [{target_lang}] 翻译失败 (id={key}, text={text_id_dict[key]}):"
-                )
+                logger.exception(f"→ [{to_lang}] 翻译失败 (id={key}, text={text_id_dict[key]}):")
             else:
                 result[key] = translated_text
 
         return result
 
-    async def bulk_translation(
-        self, text_id_dict: dict[str, str], target_lang: str = None
-    ) -> dict[str, str]:
+    async def bulk_translation(self, text_id_dict: dict[str, str], to_lang: str = None) -> dict[str, str]:
         """
         整体翻译
         :param text_id_dict:
-        :param target_lang:
+        :param to_lang:
         :return:
         """
-        with self.pbar(target_lang, 1) as pbar:
+        with self.pbar(to_lang, 1) as pbar:
             all_results = {}
             items = list(text_id_dict.items())
-            for i in range(0, len(items), self.max_concurrent):
-                batch = dict(items[i : i + self.max_concurrent])
-                batch_results = await self.translator.translate(batch, target_lang)
+            for i in range(0, len(items), self.max_concurrency):
+                batch = dict(items[i : i + self.max_concurrency])
+                batch_results = await self.translator.translate(batch, to_lang)
                 all_results |= batch_results
             pbar.update()
         return all_results
 
-    async def translate(
-        self, text_list: dict[str, str], target_lang: str = None
-    ) -> dict[str, str]:
+    async def translate(self, text_list: dict[str, str], to_lang: str = None) -> dict[str, str]:
         if isinstance(self.translator, BaseItemTranslator):
-            return await self.item_translate(text_list, target_lang)
+            return await self.item_translate(text_list, to_lang)
         elif isinstance(self.translator, BaseBulkTranslator):
-            return await self.bulk_translation(text_list, target_lang)
+            return await self.bulk_translation(text_list, to_lang)
         else:
             raise ValueError("translation_mode 必须是 'item' 或 'bulk'")
 
@@ -289,9 +271,7 @@ class Builder:
         :return:
         """
         module = ast.parse(file.read_text(encoding="utf-8"))
-        return ASTParser(
-            sep=self.sep, i18n_function_names=self.i18n_function_names
-        ).extract_all(node=module)
+        return ASTParser(sep=self.sep, i18n_function_names=self.func_names).extract_all(node=module)
 
     def save_to_yaml(self, i18n_dict: dict, lang: str):
         """
@@ -300,7 +280,7 @@ class Builder:
         :param lang: 目标语言
         :return:
         """
-        with open(self.i18n_file_dir / f"{lang}.yaml", "w", encoding="utf-8") as f:
+        with open(self.locales_dir / f"{lang}.yaml", "w", encoding="utf-8") as f:
             yaml.dump(i18n_dict, f, allow_unicode=True)
 
     @staticmethod
@@ -315,7 +295,7 @@ class Builder:
 
         i18n_id_dict = i18n_dict.copy()
         for lang in i18n_id_dict:
-            i18n_id_dict[lang] = [k for k in i18n_id_dict[lang]]
+            i18n_id_dict[lang] = list(i18n_id_dict[lang])
         return i18n_id_dict
 
     def pbar(self, lang: str, total: int):
@@ -326,5 +306,5 @@ class Builder:
             ncols=80,
             bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
             colour="blue",
-            disable=self.disable_progress_bar,
+            disable=not self.show_progress,
         )

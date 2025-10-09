@@ -1,18 +1,19 @@
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
 class I18nConfig:
-    i18n_function_names: list[str] = ["_"]
-    """翻译函数名"""
+    func_names: list[str] = ["_"]
+    """翻译函数的名称"""
 
-    i18n_dir = os.getcwd() / Path("i18n")
-    """翻译文件保存目录"""
+    locales_dir = os.getcwd() / Path("i18n")
+    """语言文件存放目录"""
 
-    def_sep = " "
+    sep = " "
     """默认分隔符"""
 
 

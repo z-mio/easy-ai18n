@@ -19,9 +19,7 @@ class Loader:
         i18n_files = self.i18n_file_dir.glob("**/*.yaml")
         if lang:
             lang = lang if isinstance(lang, list) else [lang]
-            i18n_files = [
-                file for file in i18n_files if file.name.split(".")[0] in lang
-            ]
+            i18n_files = [file for file in i18n_files if file.name.split(".")[0] in lang]
 
         if not i18n_files:
             return {}

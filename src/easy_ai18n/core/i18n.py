@@ -2,22 +2,23 @@
 翻译函数, 语言选择器
 """
 
-import abc
-import ast
 import inspect
 import sys
 from pathlib import Path
 from types import FrameType
-from typing import Type, Union
+from typing import TYPE_CHECKING
 
-from .loader import Loader
-from .parser import ASTParser, StringData
 from ..config import ic
 from ..log import logger
-from ..utils import gen_id, to_list
+from ..utils import gen_id
+from .loader import Loader
+from .parser import ASTParser, StringData
+
+if TYPE_CHECKING:
+    import ast
 
 
-class PreLanguageSelector(abc.ABC):
+class PreLocaleSelector:
     """前置语言选择器"""
 
     def __init__(self, *, i18n: "I18n", sep: str, lang: str = None):
@@ -53,7 +54,7 @@ class I18nContent(str):
         i18n_dict: dict,
         variables: dict = None,
         lang: str = None,
-        post_lang_selector: Type["PostLanguageSelector"] | None = None,
+        post_locale_selector: type["PostLocaleSelector"] | None = None,
     ):
         return str.__new__(cls, text)
 
@@ -64,12 +65,12 @@ class I18nContent(str):
         i18n_dict: dict,
         variables: dict = None,
         lang: str = None,
-        post_lang_selector: Type["PostLanguageSelector"] | None = None,
+        post_locale_selector: type["PostLocaleSelector"] | None = None,
     ):
         self._text = text
         self._variables = variables or {}
         self._lang = lang
-        self._post_lang_selector = post_lang_selector or PostLanguageSelector
+        self._post_locale_selector = post_locale_selector or PostLocaleSelector
         self._i18n_dict = i18n_dict
 
     def __str__(self) -> str:
@@ -78,16 +79,16 @@ class I18nContent(str):
     def __repr__(self) -> str:
         return self.__getitem__(self._lang)
 
-    def __getitem__(self, lang: Union[int, slice, any]) -> str:
+    def __getitem__(self, lang: int | slice | any) -> str:
         """_('内容')[后置语言选择器]"""
         if isinstance(lang, (int, slice)):
             return super().__getitem__(lang)
         return self.__call__(lang)
 
-    def __call__(self, lang: Union[int, slice, any]):
+    def __call__(self, lang: int | slice | any):
         """_('内容')(后置语言选择器)"""
         return str(
-            self._post_lang_selector(
+            self._post_locale_selector(
                 text=self._text,
                 i18n_dict=self._i18n_dict,
                 variables=self._variables,
@@ -99,7 +100,7 @@ class I18nContent(str):
         return int(self.__str__())
 
 
-class PostLanguageSelector(abc.ABC):
+class PostLocaleSelector:
     """后置语言选择器"""
 
     def __init__(
@@ -149,40 +150,38 @@ class PostLanguageSelector(abc.ABC):
 class I18n:
     def __init__(
         self,
-        languages: str | list[str] = None,
-        global_lang: str = None,
+        enabled_locales: list[str] = None,
+        default_locale: str = None,
         sep: str = None,
-        i18n_file_dir: str | Path = None,
-        i18n_function_names: str | list[str] = None,
-        pre_lang_selector: Type[PreLanguageSelector] | None = None,
-        post_lang_selector: Type[PostLanguageSelector] | None = None,
+        locales_dir: str | Path = None,
+        func_names: list[str] = None,
+        pre_locale_selector: type[PreLocaleSelector] | None = None,
+        post_locale_selector: type[PostLocaleSelector] | None = None,
     ):
         """
         初始化I18n
-        :param languages: 要启用的语言
-        :param global_lang: 全局默认使用的语言
+        :param enabled_locales: 要启用的语言
+        :param default_locale: 默认使用的语言
         :param sep: 字符串分隔符
-        :param i18n_function_names: 翻译函数名
-        :param pre_lang_selector: 前置语言选择器类
-        :param post_lang_selector: 后置语言选择器类
+        :param func_names: 翻译函数名
+        :param pre_locale_selector: 前置语言选择器类
+        :param post_locale_selector: 后置语言选择器类
         """
         self._cache: dict[str, ast.Call] = {}
         self._parse_failures: set[str] = set()
 
-        self.global_lang = global_lang
-        self.languages = to_list(languages)
-        if self.languages and self.global_lang not in self.languages:
-            self.languages.append(self.global_lang)
+        self.default_locale = default_locale
+        self.enabled_locales = enabled_locales
+        if self.enabled_locales and self.default_locale not in self.enabled_locales:
+            self.enabled_locales.append(self.default_locale)
 
         self.sep = sep or ic.def_sep
-        self.i18n_file_dir = i18n_file_dir or ic.i18n_dir
-        self.i18n_function_names = (
-            to_list(i18n_function_names) or ic.i18n_function_names
-        )
-        self.pre_lang_selector = pre_lang_selector or PreLanguageSelector
-        self.post_lang_selector = post_lang_selector or PostLanguageSelector
+        self.locales_dir = locales_dir or ic.i18n_dir
+        self.func_names = func_names or ic.func_names
+        self.pre_locale_selector = pre_locale_selector or PreLocaleSelector
+        self.post_locale_selector = post_locale_selector or PostLocaleSelector
         self.content = I18nContent
-        self.i18n_dict = Loader(self.i18n_file_dir).load_i18n_file(self.languages)
+        self.i18n_dict = Loader(self.locales_dir).load_i18n_file(self.enabled_locales)
 
     def t(self, *args, sep: str = None, frame: FrameType = None) -> I18nContent:  # type: ignore
         """
@@ -202,7 +201,7 @@ class I18n:
             return self.content(
                 text=original,
                 i18n_dict=self.i18n_dict,
-                post_lang_selector=self.post_lang_selector,
+                post_locale_selector=self.post_locale_selector,
             )
         positions = (
             f.f_lineno,
@@ -217,16 +216,14 @@ class I18n:
             return self.content(
                 text=original,
                 i18n_dict=self.i18n_dict,
-                post_lang_selector=self.post_lang_selector,
+                post_locale_selector=self.post_locale_selector,
             )
 
         # 获取缓存的节点
         call_node = self._cache.get(cache_key, None)
 
         try:
-            result = ASTParser(
-                sep=sep, i18n_function_names=self.i18n_function_names
-            ).extract(frame=f, call_node=call_node)
+            result = ASTParser(sep=sep, i18n_function_names=self.func_names).extract(frame=f, call_node=call_node)
             return self._handle_cache(original, cache_key, result)
         except Exception:
             logger.exception("I18N解析错误")
@@ -234,15 +231,13 @@ class I18n:
             return self.content(
                 text=original,
                 i18n_dict=self.i18n_dict,
-                post_lang_selector=self.post_lang_selector,
+                post_locale_selector=self.post_locale_selector,
             )
         finally:
             # noinspection PyInconsistentReturns
             del f
 
-    def _handle_cache(
-        self, original: str, cache_key: str, result: StringData
-    ) -> I18nContent:
+    def _handle_cache(self, original: str, cache_key: str, result: StringData) -> I18nContent:
         """处理缓存并返回结果"""
         if not result:
             self._parse_failures.add(cache_key)
@@ -250,7 +245,7 @@ class I18n:
             return self.content(
                 text=original,
                 i18n_dict=self.i18n_dict,
-                post_lang_selector=self.post_lang_selector,
+                post_locale_selector=self.post_locale_selector,
             )
 
         self._cache[cache_key] = result.call_node
@@ -258,8 +253,8 @@ class I18n:
             text=result.string,
             i18n_dict=self.i18n_dict,
             variables=result.variables,
-            lang=self.global_lang,
-            post_lang_selector=self.post_lang_selector,
+            lang=self.default_locale,
+            post_locale_selector=self.post_locale_selector,
         )
 
     def clear_cache(self):
@@ -267,9 +262,9 @@ class I18n:
         self._cache.clear()
         self._parse_failures.clear()
 
-    def __getitem__(self, lang: any) -> PreLanguageSelector:
+    def __getitem__(self, lang: str) -> PreLocaleSelector:
         """调用前置语言选择器"""
-        return self.pre_lang_selector(i18n=self, lang=lang, sep=self.sep)
+        return self.pre_locale_selector(i18n=self, lang=lang, sep=self.sep)
 
     def __call__(self, *args, sep: str = None) -> I18nContent:
         """调用入口函数"""

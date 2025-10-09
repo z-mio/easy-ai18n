@@ -4,19 +4,18 @@
 
 import os
 from pprint import PrettyPrinter
-from typing import List
 
 import instructor
 from googletrans import Translator as Gt
 from instructor.core import InstructorRetryException
 from openai import AsyncOpenAI
+from pydantic import BaseModel, Field
+from tenacity import retry, stop_after_attempt, wait_fixed
 
-from .base import BaseItemTranslator, BaseBulkTranslator
-from .utils import build_messages
 from ..error import TranslationError
 from ..prompts.translate import TRANSLATE_PROMPT
-from tenacity import retry, stop_after_attempt, wait_fixed
-from pydantic import BaseModel, Field
+from .base import BaseBulkTranslator, BaseItemTranslator
+from .utils import build_messages
 
 
 class GoogleTranslator(BaseItemTranslator):
@@ -27,7 +26,7 @@ class GoogleTranslator(BaseItemTranslator):
         try:
             result = await Gt().translate(text, dest=target_lang)
         except Exception as e:
-            raise TranslationError(f"谷歌翻译错误: {e}")
+            raise TranslationError(f"谷歌翻译错误: {e}") from e
         else:
             return result.text
 
@@ -75,13 +74,11 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=build_messages(
-                    self.prompt, f"Translate the text to {target_lang}:\n{text}"
-                ),
+                messages=build_messages(self.prompt, f"Translate the text to {target_lang}:\n{text}"),
                 temperature=0,
             )
         except Exception as e:
-            raise TranslationError(f"OpenAI翻译错误: {e}")
+            raise TranslationError(f"OpenAI翻译错误: {e}") from e
         else:
             return response.choices[0].message.content
 
@@ -108,9 +105,7 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         :param prompt: 提示词
         """
         BaseOpenAITranslator.__init__(self, api_key, base_url, model, prompt)
-        self.client = instructor.from_openai(
-            AsyncOpenAI(api_key=api_key, base_url=base_url)
-        )
+        self.client = instructor.from_openai(AsyncOpenAI(api_key=api_key, base_url=base_url))
 
     async def translate(self, text_id_dict: dict, target_lang: str) -> dict:
         """
@@ -126,15 +121,13 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
                     self.prompt,
                     f"Translate the text to {target_lang}:\n{text}",
                 ),
-                response_model=List[TranslatorResult],
+                response_model=list[TranslatorResult],
                 max_retries=3,
                 temperature=0,
             )
         except InstructorRetryException as e:
-            raise TranslationError(
-                f"OpenAI翻译结果验证错误: {e.messages[-1]['content']}"
-            )
+            raise TranslationError(f"OpenAI翻译结果验证错误: {e.messages[-1]['content']}") from e
         except Exception as e:
-            raise TranslationError(f"OpenAI翻译错误: {e}")
+            raise TranslationError(f"OpenAI翻译错误: {e}") from e
         else:
             return {kv.key: kv.value for kv in response}
