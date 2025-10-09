@@ -22,7 +22,7 @@ from .parser import ASTParser, StringData
 class Builder:
     def __init__(
         self,
-        to_lang: list[str] = None,
+        to_locales: list[str] = None,
         sep: str = None,
         func_names: list[str] = None,
         project_root: str = None,
@@ -35,7 +35,7 @@ class Builder:
     ):
         """
         初始化Builder
-        :param to_lang: 要翻译到的目标语言
+        :param to_locales: 要翻译到的目标语言
         :param sep: 分隔符
         :param func_names: 翻译函数名
         :param project_root: 项目根目录
@@ -52,16 +52,16 @@ class Builder:
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
         self.func_names = func_names or ic.func_names
         self.sep = sep or ic.sep
-        if to_lang is None:
-            raise ValueError("构建失败: to_lang 未配置")
-        self.to_lang = to_lang
+        if to_locales is None:
+            raise ValueError("构建失败: to_locales 未配置")
+        self.to_locales = to_locales
         self.locales_dir = to_path(locales_dir) or ic.locales_dir
         self.translator = translator or GoogleTranslator()
 
         self.project_files = self.load_file()
         self.show_progress = show_progress
         self.max_concurrency = max_concurrency or (30 if isinstance(self.translator, BaseItemTranslator) else 50)
-        self._i18n_dict = Loader(self.locales_dir).load_i18n_file(self.to_lang)
+        self._locales_dict = Loader(self.locales_dir).load_locale_file(self.to_locales)
 
     async def run(self) -> None:
         if not self.is_changed():
@@ -79,9 +79,9 @@ class Builder:
         :param save_to_file: 是否保存到文件
         :return:
         """
-        updated_i18n_dict, to_be_translated = self.check_chage()
+        updated_locales_dict, to_be_translated = self.check_chage()
 
-        for lang, sd_list in to_be_translated.items():
+        for locale, sd_list in to_be_translated.items():
             try:
                 text_id_dict = {gen_id(sd.string): sd for sd in sd_list}  # 原文id字典
                 # 变量替换
@@ -95,7 +95,7 @@ class Builder:
                     else:
                         str_list[k] = sd.string
                 # 翻译
-                trans_result = await self.translate(str_list, lang)
+                trans_result = await self.translate(str_list, locale)
 
                 # 还原变量
                 for k, sd in text_id_dict.items():
@@ -105,14 +105,14 @@ class Builder:
                             text = text.replace(f"{{{{{i}}}}}", var)
                         trans_result[k] = text
             except Exception:
-                logger.exception(f"翻译到 {lang} 失败:")
+                logger.exception(f"翻译到 {locale} 失败:")
             else:
-                updated_i18n_dict.setdefault(lang, {})
-                updated_i18n_dict[lang] |= trans_result
+                updated_locales_dict.setdefault(locale, {})
+                updated_locales_dict[locale] |= trans_result
 
         if save_to_file:
-            for lang in updated_i18n_dict:
-                self.save_to_yaml(updated_i18n_dict[lang], lang)
+            for locale in updated_locales_dict:
+                self.save_to_yaml(updated_locales_dict[locale], locale)
         return True
 
     def check_chage(self, log: bool = True) -> tuple[dict[str, dict], dict[str, list[StringData]]]:
@@ -128,40 +128,40 @@ class Builder:
                     continue
                 str_id_dict[gen_id(sd.string)] = sd
 
-        updated_i18n_dict = copy.deepcopy(self._i18n_dict)
+        updated_locales_dict = copy.deepcopy(self._locales_dict)
         to_be_translated: dict[str, list[StringData]] = {}
         # 添加新语言
-        for lang in self.to_lang:
-            if lang not in updated_i18n_dict:
-                updated_i18n_dict.setdefault(lang, {})
-                lg(f"新语言: {lang}")
+        for locale in self.to_locales:
+            if locale not in updated_locales_dict:
+                updated_locales_dict.setdefault(locale, {})
+                lg(f"新语言: {locale}")
         # 移除过期语言
-        for lang in list(self._i18n_dict.keys()):
-            if lang not in self.to_lang and lang in updated_i18n_dict:
-                del updated_i18n_dict[lang]
-                lg(f"过期语言: {lang}")
-        updated_i18n_id_dict = self.i18n_dict_to_id_dict(updated_i18n_dict)
+        for locale in list(self._locales_dict.keys()):
+            if locale not in self.to_locales and locale in updated_locales_dict:
+                del updated_locales_dict[locale]
+                lg(f"过期语言: {locale}")
+        updated_locales_id_dict = self.locales_dict_to_id_dict(updated_locales_dict)
         # 添加新翻译
         for trans_id, sd in str_id_dict.items():
-            for lang in updated_i18n_dict:
-                if trans_id in updated_i18n_dict[lang]:
+            for locale in updated_locales_dict:
+                if trans_id in updated_locales_dict[locale]:
                     continue
 
-                to_be_translated.setdefault(lang, [])
-                if sd.string not in to_be_translated[lang]:
-                    to_be_translated[lang].append(sd)
+                to_be_translated.setdefault(locale, [])
+                if sd.string not in to_be_translated[locale]:
+                    to_be_translated[locale].append(sd)
 
-                lg(f"新内容: {lang} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}")
+                lg(f"新内容: {locale} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}")
         # 移除过期翻译
-        for lang in updated_i18n_id_dict:
-            for trans_id in list(updated_i18n_id_dict[lang]):
+        for locale in updated_locales_id_dict:
+            for trans_id in list(updated_locales_id_dict[locale]):
                 if trans_id in str_id_dict:
                     continue
-                if trans_id not in updated_i18n_dict[lang]:
+                if trans_id not in updated_locales_dict[locale]:
                     continue
-                del updated_i18n_dict[lang][trans_id]
-                lg(f"过期内容: {lang} - {trans_id}")
-        return updated_i18n_dict, to_be_translated
+                del updated_locales_dict[locale][trans_id]
+                lg(f"过期内容: {locale} - {trans_id}")
+        return updated_locales_dict, to_be_translated
 
     def load_file(self):
         project_files = []
@@ -173,10 +173,7 @@ class Builder:
             dirs[:] = [
                 d
                 for d in dirs
-                if not any(
-                    (Path(root) / d).relative_to(self.project_root).match(str(exc))
-                    for exc in self.default_exclude + exclude_paths
-                )
+                if not any((Path(root) / d).relative_to(self.project_root).match(str(exc)) for exc in self.default_exclude + exclude_paths)
             ]
             for fname in files:
                 if not fname.endswith(".py"):
@@ -201,29 +198,29 @@ class Builder:
         :return:
         """
 
-        updated_i18n_dict, to_be_translated = self.check_chage(log=False)
-        return bool(updated_i18n_dict != self._i18n_dict or to_be_translated)
+        updated_locale_dict, to_be_translated = self.check_chage(log=False)
+        return bool(updated_locale_dict != self._locales_dict or to_be_translated)
 
-    async def item_translate(self, text_id_dict: dict[str, str], to_lang: str = None) -> dict[str, str]:
+    async def item_translate(self, text_id_dict: dict[str, str], to_locale: str = None) -> dict[str, str]:
         """
         逐条翻译
         :param text_id_dict: 待翻译的字符串字典 {id: text}
-        :param to_lang: 目标语言
+        :param to_locale: 目标语言
         :return: 翻译后的字典 {id: translated_text}
         """
         result: dict[str, str] = {}
-        pbar = self.pbar(to_lang, len(text_id_dict))
+        pbar = self.pbar(to_locale, len(text_id_dict))
 
         semaphore = asyncio.Semaphore(self.max_concurrency)
 
-        async def _translate_one(text: str, lang: str, sem: asyncio.Semaphore) -> str:
+        async def _translate_one(text: str, locale: str, sem: asyncio.Semaphore) -> str:
             async with sem:
-                translated = await self.translator.translate(text, lang)
+                translated = await self.translator.translate(text, locale)
                 pbar.update()
                 return translated
 
         tasks: dict[str, asyncio.Task] = {
-            key: asyncio.create_task(_translate_one(text, to_lang, semaphore)) for key, text in text_id_dict.items()
+            key: asyncio.create_task(_translate_one(text, to_locale, semaphore)) for key, text in text_id_dict.items()
         }
 
         done, _ = await asyncio.wait(tasks.values())
@@ -233,34 +230,34 @@ class Builder:
             try:
                 translated_text = task.result()
             except Exception:
-                logger.exception(f"→ [{to_lang}] 翻译失败 (id={key}, text={text_id_dict[key]}):")
+                logger.exception(f"→ [{to_locale}] 翻译失败 (id={key}, text={text_id_dict[key]}):")
             else:
                 result[key] = translated_text
 
         return result
 
-    async def bulk_translation(self, text_id_dict: dict[str, str], to_lang: str = None) -> dict[str, str]:
+    async def bulk_translation(self, text_id_dict: dict[str, str], to_locale: str = None) -> dict[str, str]:
         """
         整体翻译
         :param text_id_dict:
-        :param to_lang:
+        :param to_locale:
         :return:
         """
-        with self.pbar(to_lang, 1) as pbar:
+        with self.pbar(to_locale, 1) as pbar:
             all_results = {}
             items = list(text_id_dict.items())
             for i in range(0, len(items), self.max_concurrency):
                 batch = dict(items[i : i + self.max_concurrency])
-                batch_results = await self.translator.translate(batch, to_lang)
+                batch_results = await self.translator.translate(batch, to_locale)
                 all_results |= batch_results
             pbar.update()
         return all_results
 
-    async def translate(self, text_list: dict[str, str], to_lang: str = None) -> dict[str, str]:
+    async def translate(self, text_list: dict[str, str], to_locale: str = None) -> dict[str, str]:
         if isinstance(self.translator, BaseItemTranslator):
-            return await self.item_translate(text_list, to_lang)
+            return await self.item_translate(text_list, to_locale)
         elif isinstance(self.translator, BaseBulkTranslator):
-            return await self.bulk_translation(text_list, to_lang)
+            return await self.bulk_translation(text_list, to_locale)
         else:
             raise ValueError("translation_mode 必须是 'item' 或 'bulk'")
 
@@ -271,37 +268,37 @@ class Builder:
         :return:
         """
         module = ast.parse(file.read_text(encoding="utf-8"))
-        return ASTParser(sep=self.sep, i18n_function_names=self.func_names).extract_all(node=module)
+        return ASTParser(sep=self.sep, func_names=self.func_names).extract_all(node=module)
 
-    def save_to_yaml(self, i18n_dict: dict, lang: str):
+    def save_to_yaml(self, locale_dict: dict, locale: str):
         """
         将翻译结果输出到文件
-        :param i18n_dict: 翻译结果字典
-        :param lang: 目标语言
+        :param locale_dict: 翻译结果字典
+        :param locale: 目标语言
         :return:
         """
-        with open(self.locales_dir / f"{lang}.yaml", "w", encoding="utf-8") as f:
-            yaml.dump(i18n_dict, f, allow_unicode=True)
+        with open(self.locales_dir / f"{locale}.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(locale_dict, f, allow_unicode=True)
 
     @staticmethod
-    def i18n_dict_to_id_dict(i18n_dict: dict) -> dict[str, list[str]]:
+    def locales_dict_to_id_dict(locales_dict: dict) -> dict[str, list[str]]:
         """
-        获取i18n字典中的所有id
+        获取 locales 字典中的所有id
         :return:
         """
 
-        if not i18n_dict:
+        if not locales_dict:
             return {}
 
-        i18n_id_dict = i18n_dict.copy()
-        for lang in i18n_id_dict:
-            i18n_id_dict[lang] = list(i18n_id_dict[lang])
-        return i18n_id_dict
+        locales_id_dict = locales_dict.copy()
+        for locale in locales_id_dict:
+            locales_id_dict[locale] = list(locales_id_dict[locale])
+        return locales_id_dict
 
-    def pbar(self, lang: str, total: int):
+    def pbar(self, locale: str, total: int):
         return tqdm(
             total=total,
-            desc=f"⏳ 翻译中 → {lang}",
+            desc=f"⏳ 翻译中 → {locale}",
             unit="条",
             ncols=80,
             bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",

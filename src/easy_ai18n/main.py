@@ -32,7 +32,7 @@ class EasyAI18n:
 
     def build(
         self,
-        to_lang: str | list[str],
+        to_locales: str | list[str],
         project_root: str | Path = None,
         include: list[str] = None,
         exclude: list[str] = None,
@@ -42,7 +42,7 @@ class EasyAI18n:
     ):
         """
         构建翻译文件
-        :param to_lang: 要翻译到的目标语言
+        :param to_locales: 要翻译到的目标语言
         :param project_root: 项目根目录
         :param include: 包含的文件或目录
         :param exclude: 排除的文件或目录
@@ -53,7 +53,7 @@ class EasyAI18n:
         """
         return asyncio.run(
             self.build_async(
-                to_lang,
+                to_locales,
                 project_root,
                 include,
                 exclude,
@@ -65,7 +65,7 @@ class EasyAI18n:
 
     async def build_async(
         self,
-        to_lang: str | list[str],
+        to_locales: str | list[str],
         project_root: str | Path = None,
         include: list[str] = None,
         exclude: list[str] = None,
@@ -75,7 +75,7 @@ class EasyAI18n:
     ):
         """
         异步构建翻译文件
-        :param to_lang: 要翻译到的目标语言
+        :param to_locales: 要翻译到的目标语言
         :param project_root: 项目根目录
         :param include: 包含的文件或目录
         :param exclude: 排除的文件或目录
@@ -85,7 +85,7 @@ class EasyAI18n:
         :return:
         """
         builder = Builder(
-            to_lang=to_list(to_lang),
+            to_locales=to_list(to_locales),
             sep=self.sep,
             func_names=self.func_names,
             project_root=project_root,

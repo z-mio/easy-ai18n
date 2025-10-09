@@ -46,9 +46,9 @@ class StringConstructor:
     根据传入的 AST 节点构造字符串，同时处理 f-string 表达式。
     """
 
-    def __init__(self, sep: str, i18n_function_names: list[str]):
+    def __init__(self, sep: str, func_names: list[str]):
         self.sep = sep
-        self.i18n_function_names = i18n_function_names
+        self.func_names = func_names
 
     def construct_from_node(self, call_node: ast.Call, evaluator: "VariableEvaluator" = None) -> tuple[str, dict]:
         sep = next(
@@ -69,7 +69,7 @@ class StringConstructor:
                 else:
                     # 将其他表达式包装为 f-string
                     expr_src = ast.unparse(arg)  # type: ignore
-                    wrapper = f'{self.i18n_function_names[0]}(f"{{{expr_src}}}")'
+                    wrapper = f'{self.func_names[0]}(f"{{{expr_src}}}")'
                     wrapper_call: ast.Call = ast.parse(wrapper).body[0].value  # type: ignore
                     part, found = self._handle_f_string(wrapper_call.args[0], evaluator)  # type: ignore
 
@@ -226,9 +226,9 @@ class VariableEvaluator:
 
 
 class ASTParser:
-    def __init__(self, sep: str, i18n_function_names: list[str]):
+    def __init__(self, sep: str, func_names: list[str]):
         self.sep = sep
-        self.i18n_function_names = i18n_function_names
+        self.func_names = func_names
 
     @staticmethod
     @cache
@@ -268,7 +268,7 @@ class ASTParser:
             return []
 
         results = []
-        string_constructor = StringConstructor(sep=self.sep, i18n_function_names=self.i18n_function_names)
+        string_constructor = StringConstructor(sep=self.sep, func_names=self.func_names)
         for call_node in target_nodes:
             constructed, vars_found = string_constructor.construct_from_node(call_node, None)
             results.append(StringData(constructed, vars_found, call_node))
@@ -293,7 +293,7 @@ class ASTParser:
             else:
                 return None
 
-        string_constructor = StringConstructor(sep=self.sep, i18n_function_names=self.i18n_function_names)
+        string_constructor = StringConstructor(sep=self.sep, func_names=self.func_names)
         constructed, vars_found = string_constructor.construct_from_node(
             call_node,
             VariableEvaluator(frame.f_globals, frame.f_locals) if frame else None,
@@ -301,6 +301,6 @@ class ASTParser:
         return StringData(constructed, vars_found, call_node)
 
     def get_target_nodes(self, node: ast.AST) -> list[ast.Call]:
-        visitor = CallVisitor(self.i18n_function_names)
+        visitor = CallVisitor(self.func_names)
         visitor.visit(node)
         return visitor.nodes

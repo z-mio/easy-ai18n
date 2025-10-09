@@ -2,31 +2,31 @@ from pathlib import Path
 
 import yaml
 
+from ..utils import to_list
+
 
 class Loader:
-    def __init__(self, i18n_file_dir: str | Path):
-        self.i18n_file_dir = i18n_file_dir
+    def __init__(self, locales_dir: str | Path):
+        self.locales_dir = locales_dir
 
-    def load_i18n_file(self, lang: str | list[str] = None) -> dict[str, dict]:
+    def load_locale_file(self, locales: str | list[str] = None) -> dict[str, dict]:
         """
-        加载i18n目录下的yaml文件
-        :return: i18n字典
+        加载 locales 目录下的 yaml 文件
+        :return: locales 字典
         """
-        if lang is not None:
-            lang = lang if isinstance(lang, list) else [lang]
+        if locales is not None:
+            locales = to_list(locales)
 
-        i18n_dict = {}
-        i18n_files = self.i18n_file_dir.glob("**/*.yaml")
-        if lang:
-            lang = lang if isinstance(lang, list) else [lang]
-            i18n_files = [file for file in i18n_files if file.name.split(".")[0] in lang]
+        locales_dict = {}
+        locale_files = self.locales_dir.glob("**/*.yaml")
+        locale_files = [file for file in locale_files if file.name.split(".")[0] in locales]
 
-        if not i18n_files:
+        if not locale_files:
             return {}
 
-        for file in i18n_files:
+        for file in locale_files:
             f = yaml.safe_load(Path(file).read_text(encoding="utf-8"))
             if not f:
                 continue
-            i18n_dict[file.name.split(".")[0]] = f
-        return i18n_dict
+            locales_dict[file.name.split(".")[0]] = f
+        return locales_dict

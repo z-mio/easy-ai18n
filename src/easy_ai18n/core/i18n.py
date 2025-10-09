@@ -21,9 +21,9 @@ if TYPE_CHECKING:
 class PreLocaleSelector:
     """前置语言选择器"""
 
-    def __init__(self, *, i18n: "I18n", sep: str, lang: str = None):
+    def __init__(self, *, i18n: "I18n", sep: str, locale: str = None):
         self.i18n = i18n
-        self.lang = lang
+        self.locale = locale
         self.sep = sep
 
     def __str__(self) -> str:
@@ -41,19 +41,19 @@ class PreLocaleSelector:
         :return:
         """
         frame = inspect.currentframe().f_back
-        return self.i18n.t(*args, sep=sep or self.sep, frame=frame)[self.lang]
+        return self.i18n.t(*args, sep=sep or self.sep, frame=frame)[self.locale]
 
 
-class I18nContent(str):
+class LocaleContent(str):
     """内容"""
 
     def __new__(
         cls,
         *,
         text: str,
-        i18n_dict: dict,
+        locales_dict: dict,
         variables: dict = None,
-        lang: str = None,
+        locale: str = None,
         post_locale_selector: type["PostLocaleSelector"] | None = None,
     ):
         return str.__new__(cls, text)
@@ -62,37 +62,37 @@ class I18nContent(str):
         self,
         *,
         text: str,
-        i18n_dict: dict,
+        locales_dict: dict,
         variables: dict = None,
-        lang: str = None,
+        locale: str = None,
         post_locale_selector: type["PostLocaleSelector"] | None = None,
     ):
         self._text = text
         self._variables = variables or {}
-        self._lang = lang
+        self._locale = locale
         self._post_locale_selector = post_locale_selector or PostLocaleSelector
-        self._i18n_dict = i18n_dict
+        self._locales_dict = locales_dict
 
     def __str__(self) -> str:
-        return self.__getitem__(self._lang)
+        return self.__getitem__(self._locale)
 
     def __repr__(self) -> str:
-        return self.__getitem__(self._lang)
+        return self.__getitem__(self._locale)
 
-    def __getitem__(self, lang: int | slice | any) -> str:
+    def __getitem__(self, locale: int | slice | str) -> str:
         """_('内容')[后置语言选择器]"""
-        if isinstance(lang, (int, slice)):
-            return super().__getitem__(lang)
-        return self.__call__(lang)
+        if isinstance(locale, (int, slice)):
+            return super().__getitem__(locale)
+        return self.__call__(locale)
 
-    def __call__(self, lang: int | slice | any):
+    def __call__(self, locale: int | slice | str):
         """_('内容')(后置语言选择器)"""
         return str(
             self._post_locale_selector(
                 text=self._text,
-                i18n_dict=self._i18n_dict,
+                locales_dict=self._locales_dict,
                 variables=self._variables,
-                lang=lang,
+                locale=locale,
             )
         )
 
@@ -107,9 +107,9 @@ class PostLocaleSelector:
         self,
         *,
         text: str,
-        i18n_dict: dict,
+        locales_dict: dict,
         variables: dict = None,
-        lang: str = None,
+        locale: str = None,
     ):
         """
         语言选择器，用于选择翻译后的语言
@@ -118,24 +118,24 @@ class PostLocaleSelector:
         """
         self.text = text
         self.variables = variables or {}
-        self.lang = lang
-        self.i18n_dict = i18n_dict
+        self.locale = locale
+        self.locales_dict = locales_dict
 
     def __str__(self) -> str:
-        return self.__getitem__(self.lang)
+        return self.__getitem__(self.locale)
 
     def __repr__(self) -> str:
-        return self.__getitem__(self.lang)
+        return self.__getitem__(self.locale)
 
     def __getitem__(self, key: str | None) -> str:
         """_('内容')[后置语言选择器]"""
         return self.format(key)
 
-    def format(self, lang: str | None = None) -> str:
+    def format(self, locale: str | None = None) -> str:
         """格式化字符串并应用翻译"""
-        if not lang:
+        if not locale:
             return self._format(self.text)
-        translated = self.get_by_text(self.text, lang)
+        translated = self.get_by_text(self.text, locale)
         return self._format(translated)
 
     def _format(self, raw_string) -> str:
@@ -143,8 +143,8 @@ class PostLocaleSelector:
             raw_string = raw_string.replace(v, str(self.variables[v]))
         return raw_string
 
-    def get_by_text(self, text: str, lang: str = None):
-        return self.i18n_dict.get(lang, {}).get(gen_id(text), text)
+    def get_by_text(self, text: str, locale: str = None):
+        return self.locales_dict.get(locale, {}).get(gen_id(text), text)
 
 
 class I18n:
@@ -180,10 +180,10 @@ class I18n:
         self.func_names = func_names or ic.func_names
         self.pre_locale_selector = pre_locale_selector or PreLocaleSelector
         self.post_locale_selector = post_locale_selector or PostLocaleSelector
-        self.content = I18nContent
-        self.i18n_dict = Loader(self.locales_dir).load_i18n_file(self.enabled_locales)
+        self.content = LocaleContent
+        self.locales_dict = Loader(self.locales_dir).load_locale_file(self.enabled_locales)
 
-    def t(self, *args, sep: str = None, frame: FrameType = None) -> I18nContent:  # type: ignore
+    def t(self, *args, sep: str = None, frame: FrameType = None) -> LocaleContent:  # type: ignore
         """
         入口函数
 
@@ -200,7 +200,7 @@ class I18n:
         if not f:
             return self.content(
                 text=original,
-                i18n_dict=self.i18n_dict,
+                locales_dict=self.locales_dict,
                 post_locale_selector=self.post_locale_selector,
             )
         positions = (
@@ -215,7 +215,7 @@ class I18n:
         if cache_key in self._parse_failures:
             return self.content(
                 text=original,
-                i18n_dict=self.i18n_dict,
+                locales_dict=self.locales_dict,
                 post_locale_selector=self.post_locale_selector,
             )
 
@@ -223,37 +223,37 @@ class I18n:
         call_node = self._cache.get(cache_key, None)
 
         try:
-            result = ASTParser(sep=sep, i18n_function_names=self.func_names).extract(frame=f, call_node=call_node)
+            result = ASTParser(sep=sep, func_names=self.func_names).extract(frame=f, call_node=call_node)
             return self._handle_cache(original, cache_key, result)
         except Exception:
             logger.exception("I18N解析错误")
             self._parse_failures.add(cache_key)
             return self.content(
                 text=original,
-                i18n_dict=self.i18n_dict,
+                locales_dict=self.locales_dict,
                 post_locale_selector=self.post_locale_selector,
             )
         finally:
             # noinspection PyInconsistentReturns
             del f
 
-    def _handle_cache(self, original: str, cache_key: str, result: StringData) -> I18nContent:
+    def _handle_cache(self, original: str, cache_key: str, result: StringData) -> LocaleContent:
         """处理缓存并返回结果"""
         if not result:
             self._parse_failures.add(cache_key)
             logger.exception(f"I18N解析错误: {original}")
             return self.content(
                 text=original,
-                i18n_dict=self.i18n_dict,
+                locales_dict=self.locales_dict,
                 post_locale_selector=self.post_locale_selector,
             )
 
         self._cache[cache_key] = result.call_node
         return self.content(
             text=result.string,
-            i18n_dict=self.i18n_dict,
+            locales_dict=self.locales_dict,
             variables=result.variables,
-            lang=self.default_locale,
+            locale=self.default_locale,
             post_locale_selector=self.post_locale_selector,
         )
 
@@ -262,11 +262,11 @@ class I18n:
         self._cache.clear()
         self._parse_failures.clear()
 
-    def __getitem__(self, lang: str) -> PreLocaleSelector:
+    def __getitem__(self, locale: str) -> PreLocaleSelector:
         """调用前置语言选择器"""
-        return self.pre_locale_selector(i18n=self, lang=lang, sep=self.sep)
+        return self.pre_locale_selector(i18n=self, locale=locale, sep=self.sep)
 
-    def __call__(self, *args, sep: str = None) -> I18nContent:
+    def __call__(self, *args, sep: str = None) -> LocaleContent:
         """调用入口函数"""
         frame = inspect.currentframe().f_back
         return self.t(*args, sep=sep or self.sep, frame=frame)
