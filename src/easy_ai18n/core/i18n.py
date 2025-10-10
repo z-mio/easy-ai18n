@@ -234,7 +234,6 @@ class I18n:
                 post_locale_selector=self.post_locale_selector,
             )
         finally:
-            # noinspection PyInconsistentReturns
             del f
 
     def _handle_cache(self, original: str, cache_key: str, result: StringData) -> LocaleContent:
