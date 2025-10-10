@@ -58,7 +58,7 @@ i18n = EasyAI18n()
 _ = i18n.i18n()
 
 if __name__ == "__main__":
-    i18n.build(["ja"])
+    i18n.build(to_locales=["ja"])
 ```
 
 `/main.py`
@@ -98,7 +98,7 @@ easy_ai18n
 from easy_ai18n import EasyAI18n
 
 i18n = EasyAI18n(
-    i18n_function_names=["_t", '_']  # 自定义翻译函数名称
+    func_names=["_t", '_']  # 自定义翻译函数名称
 )
 
 _t = i18n.i18n()
@@ -117,7 +117,7 @@ from easy_ai18n.translator import OpenAIBulkTranslator
 translator = OpenAIBulkTranslator(api_key=..., base_url=..., model='gpt-4o-mini')
 
 i18n = EasyAI18n()
-i18n.build(target_lang=["ru", "ja", 'zh-Hant'], translator=translator)
+i18n.build(to_locales=["ru", "ja", 'zh-Hant'], translator=translator)
 
 _ = i18n.i18n()
 
@@ -151,10 +151,10 @@ print(d[3])  # output: みかん
 
 ```python
 from pyrogram.types import Message
-from easy_ai18n import EasyAI18n, PostLanguageSelector
+from easy_ai18n import EasyAI18n, PostLocaleSelector
 
 
-class MyPostLanguageSelector(PostLanguageSelector):
+class MyPostLocaleSelector(PostLocaleSelector):
     def __getitem__(self, msg: Message):
         # ......
         lang = msg.from_user.language_code
@@ -163,10 +163,10 @@ class MyPostLanguageSelector(PostLanguageSelector):
 
 i18n = EasyAI18n()
 
-_ = i18n.i18n(post_lang_selector=MyPostLanguageSelector)
+_ = i18n.i18n(post_locale_selector=MyPostLocaleSelector)
 
 if __name__ == "__main__":
-    i18n.build(target_lang=['en', 'ru'])
+    i18n.build(to_locales=['en', 'ru'])
 ```
 
 `/bot.py`:
