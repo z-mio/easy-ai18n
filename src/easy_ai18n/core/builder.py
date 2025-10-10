@@ -61,7 +61,7 @@ class Builder:
         self.project_files = self.load_file()
         self.show_progress = show_progress
         self.max_concurrency = max_concurrency or (30 if isinstance(self.translator, BaseItemTranslator) else 50)
-        self._locales_dict = Loader(self.locales_dir).load_locale_file(self.to_locales)
+        self._locales_dict = Loader(self.locales_dir).load_locales_file(self.to_locales)
 
     async def run(self) -> None:
         if not self.is_changed():
@@ -194,7 +194,7 @@ class Builder:
 
     def is_changed(self) -> bool:
         """
-        判断翻译字典是否有更新
+        判断 locales 字典是否有更新
         :return:
         """
 
@@ -259,7 +259,7 @@ class Builder:
         elif isinstance(self.translator, BaseBulkTranslator):
             return await self.bulk_translation(text_list, to_locale)
         else:
-            raise ValueError("translation_mode 必须是 'item' 或 'bulk'")
+            raise ValueError("错误的翻译器类型")
 
     def extract_strings(self, file: Path) -> list[StringData]:
         """

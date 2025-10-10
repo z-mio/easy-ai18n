@@ -181,7 +181,7 @@ class I18n:
         self.pre_locale_selector = pre_locale_selector or PreLocaleSelector
         self.post_locale_selector = post_locale_selector or PostLocaleSelector
         self.content = LocaleContent
-        self.locales_dict = Loader(self.locales_dir).load_locale_file(self.enabled_locales)
+        self.locales_dict = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
 
     def t(self, *args, sep: str = None, frame: FrameType = None) -> LocaleContent:
         """
