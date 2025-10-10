@@ -2,7 +2,6 @@
 翻译函数, 语言选择器
 """
 
-import abc
 import inspect
 import sys
 from pathlib import Path

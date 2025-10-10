@@ -141,7 +141,7 @@ class VariableEvaluator:
         self.globals = globals_dict
         self.locals = locals_dict
 
-    def evaluate(self, expr: str, conversion: str = None, format_spec: str = None) -> any:
+    def evaluate(self, expr: str, conversion: str = None, format_spec: str = None) -> object:
         """
         对表达式进行求值
 
@@ -172,7 +172,7 @@ class VariableEvaluator:
         except Exception as e:
             raise EvaluateError(e) from e
 
-    def _evaluate_basic(self, expr: str) -> any:
+    def _evaluate_basic(self, expr: str) -> object:
         """基础求值"""
         if expr.isidentifier():
             # 简单变量查找
@@ -188,7 +188,7 @@ class VariableEvaluator:
             return eval(compiled_expr, self.globals, self.locals)
 
     @staticmethod
-    def _apply_conversion(value: any, conversion: str) -> str:
+    def _apply_conversion(value: object, conversion: str) -> object:
         """应用转换标志"""
         if conversion == "s":
             return str(value)
