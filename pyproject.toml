@@ -1,6 +1,6 @@
 [project]
 name = "easy-ai18n"
-version = "1.1.0"
+version = "1.1.1"
 description = "Simple and Elegant Python3 Internationalization (i18n) Tool"
 requires-python = ">=3.12"
 readme = "README.md"
@@ -32,7 +32,7 @@ Repository = "https://github.com/z-mio/easy-ai18n"
 Issues = "https://github.com/z-mio/easy-ai18n/issues"
 
 [tool.ruff]
-line-length = 140
+line-length = 120
 exclude = [
     "tests",
 ]

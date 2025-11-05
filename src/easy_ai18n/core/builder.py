@@ -173,7 +173,10 @@ class Builder:
             dirs[:] = [
                 d
                 for d in dirs
-                if not any((Path(root) / d).relative_to(self.project_root).match(str(exc)) for exc in self.default_exclude + exclude_paths)
+                if not any(
+                    (Path(root) / d).relative_to(self.project_root).match(str(exc))
+                    for exc in self.default_exclude + exclude_paths
+                )
             ]
             for fname in files:
                 if not fname.endswith(".py"):

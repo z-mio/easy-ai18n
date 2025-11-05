@@ -1,7 +1,7 @@
 """
 AST 解析器
 获取调用函数的代码块 -> 转为 AST 节点 -> 遍历 AST 节点 -> 提取指定函数调用的节点 -> 提取字符串和变量 -> 处理变量 -> 返回结果
-"""
+"""  # noqa: E501
 
 import ast
 import inspect
@@ -26,11 +26,26 @@ class CallVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call):
         func = node.func
-        # 后置选择器：_()
+        # 后置选择器: _()
         if isinstance(func, ast.Name) and func.id in self.func_names:
             self.nodes.append(node)
-        # 前置选择器：_[]()
+        # 后置选择器: obj._()
+        elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.attr in self.func_names:
+            self.nodes.append(node)
+        # 前置选择器: _[]()
         elif isinstance(func, ast.Subscript) and isinstance(func.value, ast.Name) and func.value.id in self.func_names:
+            new_call = ast.Call(
+                func=func.slice,
+                args=node.args,
+                keywords=node.keywords,
+            )
+            self.nodes.append(new_call)
+        # 前置选择器: obj._[]()
+        elif (
+            isinstance(func, ast.Subscript)
+            and isinstance(func.value, ast.Attribute)
+            and func.value.attr in self.func_names
+        ):
             new_call = ast.Call(
                 func=func.slice,
                 args=node.args,
@@ -97,7 +112,9 @@ class StringConstructor:
                 # 获取格式说明符
                 format_spec = self._handle_format_spec(value.format_spec, evaluator)
                 # 构建格式化表达式
-                expr_ = f"{{{expr}{('!' + conversion) if conversion else ''}{(':' + format_spec) if format_spec else ''}}}"
+                expr_ = (
+                    f"{{{expr}{('!' + conversion) if conversion else ''}{(':' + format_spec) if format_spec else ''}}}"
+                )
 
                 parts.append(expr_)
 
