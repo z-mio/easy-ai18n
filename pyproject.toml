@@ -9,14 +9,14 @@ authors = [
     { name = "梓澪", email = "zilingmio@gmail.com" }
 ]
 dependencies = [
-    "googletrans",
-    "instructor",
-    "loguru",
-    "python-dotenv",
-    "pyyaml",
-    "tenacity",
-    "tqdm",
-]
+      "googletrans>=4.0.2",
+      "instructor>=1.15.1",
+      "loguru>=0.7.3",
+      "python-dotenv>=1.2.2",
+      "pyyaml>=6.0.3",
+      "tenacity>=9.1.4",
+      "tqdm>=4.67.3",
+  ]
 
 [dependency-groups]
 dev = [

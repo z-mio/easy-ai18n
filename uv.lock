@@ -335,13 +335,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "googletrans" },
-    { name = "instructor" },
-    { name = "loguru" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "tenacity" },
-    { name = "tqdm" },
+    { name = "googletrans", specifier = ">=4.0.2" },
+    { name = "instructor", specifier = ">=1.15.1" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "tenacity", specifier = ">=9.1.4" },
+    { name = "tqdm", specifier = ">=4.67.3" },
 ]
 
 [package.metadata.requires-dev]
