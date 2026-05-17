@@ -3,17 +3,20 @@ import os
 from easy_ai18n import EasyAI18n
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
-i18n = EasyAI18n(locales_dir='tests/i18n')
-_ = i18n.i18n()
 
 
-def test_build():
+
+def test_build(tmp_path):
+    i18n = EasyAI18n(locales_dir=tmp_path)
     i18n.build(project_root='tests', to_locales=["en", "ja"], include=["test_i18n.py"])
     assert i18n.locales_dir.joinpath("en.yaml").exists()
     assert i18n.locales_dir.joinpath("ja.yaml").exists()
 
 
 def test_basic():
+    i18n = EasyAI18n(locales_dir='tests/i18n')
+    _ = i18n.i18n()
+
     # 普通测试
     assert _("你好, 世界") == "你好, 世界"
     assert _("你好", ", ", "世界")["ja"] == "こんにちは世界"
