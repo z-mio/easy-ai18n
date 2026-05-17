@@ -1,14 +1,14 @@
 import os
 
-from src.easy_ai18n import EasyAI18n
+from easy_ai18n import EasyAI18n
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
-i18n = EasyAI18n()
+i18n = EasyAI18n(locales_dir='tests/i18n')
 _ = i18n.i18n()
 
 
 def test_build():
-    i18n.build(to_locales=["en", "ja"], include=["test_i18n.py"])
+    i18n.build(project_root='tests', to_locales=["en", "ja"], include=["test_i18n.py"])
     assert i18n.locales_dir.joinpath("en.yaml").exists()
     assert i18n.locales_dir.joinpath("ja.yaml").exists()
 
