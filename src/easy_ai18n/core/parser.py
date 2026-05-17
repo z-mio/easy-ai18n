@@ -3,11 +3,14 @@ AST 解析器
 获取调用函数的代码块 -> 转为 AST 节点 -> 遍历 AST 节点 -> 提取指定函数调用的节点 -> 提取字符串和变量 -> 处理变量 -> 返回结果
 """  # noqa: E501
 
+from __future__ import annotations
+
 import ast
 import inspect
 from dataclasses import dataclass
 from functools import cache
 from types import FrameType
+from typing import Any
 
 from ..error import EvaluateError, FormatError
 
@@ -15,7 +18,7 @@ from ..error import EvaluateError, FormatError
 @dataclass
 class StringData:
     string: str
-    variables: dict
+    variables: dict[str, object]
     call_node: ast.Call
 
 
@@ -65,28 +68,38 @@ class StringConstructor:
         self.sep = sep
         self.func_names = func_names
 
-    def construct_from_node(self, call_node: ast.Call, evaluator: "VariableEvaluator" = None) -> tuple[str, dict]:
-        sep = next(
-            (kw.value.value for kw in call_node.keywords if kw.arg == "sep" and isinstance(kw.value, ast.Constant)),
-            self.sep,
-        )
+    def construct_from_node(
+        self,
+        call_node: ast.Call,
+        evaluator: VariableEvaluator | None = None,
+    ) -> tuple[str, dict[str, object]]:
+        sep = self.sep
+        for kw in call_node.keywords:
+            if kw.arg == "sep" and isinstance(kw.value, ast.Constant):
+                sep = str(kw.value.value)
+                break
 
         raw_parts: list[str] = []
-        variables: dict = {}
+        variables: dict[str, object] = {}
 
         for arg in call_node.args:
             if isinstance(arg, ast.Constant):
                 # 常量字符串直接添加
-                raw_parts.append(arg.value)
+                raw_parts.append(str(arg.value))
             else:
                 if isinstance(arg, ast.JoinedStr):
                     part, found = self._handle_f_string(arg, evaluator)
                 else:
                     # 将其他表达式包装为 f-string
-                    expr_src = ast.unparse(arg)  # type: ignore
+                    expr_src = ast.unparse(arg)
                     wrapper = f'{self.func_names[0]}(f"{{{expr_src}}}")'
-                    wrapper_call: ast.Call = ast.parse(wrapper).body[0].value  # type: ignore
-                    part, found = self._handle_f_string(wrapper_call.args[0], evaluator)  # type: ignore
+                    wrapper_expr = ast.parse(wrapper).body[0]
+                    if not isinstance(wrapper_expr, ast.Expr) or not isinstance(wrapper_expr.value, ast.Call):
+                        continue
+                    wrapper_arg = wrapper_expr.value.args[0]
+                    if not isinstance(wrapper_arg, ast.JoinedStr):
+                        continue
+                    part, found = self._handle_f_string(wrapper_arg, evaluator)
 
                 raw_parts.append(part)
                 variables.update(found)
@@ -94,17 +107,21 @@ class StringConstructor:
             return r, variables
         return "", {}
 
-    def _handle_f_string(self, node: ast.JoinedStr, evaluator: "VariableEvaluator" = None) -> tuple[str, dict]:
+    def _handle_f_string(
+        self,
+        node: ast.JoinedStr,
+        evaluator: VariableEvaluator | None = None,
+    ) -> tuple[str, dict[str, object]]:
         """
         :param node:
         :param evaluator: 为 Noe 则只提取表达式, 不求值
         :return:
         """
-        parts = []
-        variables = {}
+        parts: list[str] = []
+        variables: dict[str, object] = {}
         for value in node.values:
             if isinstance(value, ast.Constant):
-                parts.append(value.value)
+                parts.append(str(value.value))
             elif isinstance(value, ast.FormattedValue):
                 expr = ast.unparse(value.value)
                 # 获取转换标志
@@ -132,9 +149,9 @@ class StringConstructor:
 
     def _handle_format_spec(
         self,
-        format_spec,
-        evaluator,
-    ):
+        format_spec: ast.expr | None,
+        evaluator: VariableEvaluator | None,
+    ) -> str | None:
         """
         处理格式说明符
         :param format_spec:
@@ -145,20 +162,20 @@ class StringConstructor:
             return None
 
         if isinstance(format_spec, ast.JoinedStr):
-            spec_str, spec_vars = self._handle_f_string(format_spec, evaluator)
+            spec_str, _ = self._handle_f_string(format_spec, evaluator)
             return spec_str
         elif isinstance(format_spec, ast.Constant):
-            return format_spec.value
+            return str(format_spec.value)
         else:
             return None
 
 
 class VariableEvaluator:
-    def __init__(self, globals_dict: dict, locals_dict: dict):
+    def __init__(self, globals_dict: dict[str, Any], locals_dict: dict[str, Any]):
         self.globals = globals_dict
         self.locals = locals_dict
 
-    def evaluate(self, expr: str, conversion: str = None, format_spec: str = None) -> object:
+    def evaluate(self, expr: str, conversion: str | None = None, format_spec: str | None = None) -> object:
         """
         对表达式进行求值
 
@@ -257,6 +274,10 @@ class ASTParser:
     def get_code_block(self, frame: FrameType) -> str:
         # 获取位置属性，跳过上下文行
         info = inspect.getframeinfo(frame, context=0).positions
+        if not info or info.lineno is None or info.end_lineno is None:
+            return ""
+        if info.col_offset is None or info.end_col_offset is None:
+            return ""
         filename = frame.f_code.co_filename
         lineno = info.lineno - 1
         end_lineno = info.end_lineno - 1
@@ -302,6 +323,8 @@ class ASTParser:
         """
         # 节点解析的性能开销大, 尽量使用缓存
         if not call_node:
+            if frame is None:
+                return None
             call_text = self.get_code_block(frame)
             node = ast.parse(call_text.strip())
             target_nodes = self.get_target_nodes(node)

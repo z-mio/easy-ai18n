@@ -5,15 +5,15 @@ import yaml
 
 class Loader:
     def __init__(self, locales_dir: str | Path):
-        self.locales_dir = locales_dir
+        self.locales_dir = Path(locales_dir)
 
-    def load_locales_file(self, locales: list[str] = None) -> dict[str, dict]:
+    def load_locales_file(self, locales: list[str] | None = None) -> dict[str, dict]:
         """
         加载 locales 目录下的 yaml 文件
         :return: locales 字典
         """
-        locales_dict = {}
-        yaml_files = self.locales_dir.glob("**/*.yaml")
+        locales_dict: dict[str, dict] = {}
+        yaml_files = list(self.locales_dir.glob("**/*.yaml"))
         if locales:
             yaml_files = [file for file in yaml_files if file.name.split(".")[0] in locales]
 

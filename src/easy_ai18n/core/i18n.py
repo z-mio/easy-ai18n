@@ -6,7 +6,7 @@ import inspect
 import sys
 from pathlib import Path
 from types import FrameType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, SupportsIndex, overload
 
 from ..config import ic
 from ..log import logger
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class PreLocaleSelector:
     """前置语言选择器"""
 
-    def __init__(self, *, i18n: "I18n", sep: str, locale: str = None):
+    def __init__(self, *, i18n: "I18n", sep: str, locale: str | None = None):
         self.i18n = i18n
         self.sep = sep
         self.locale = locale
@@ -32,7 +32,7 @@ class PreLocaleSelector:
     def __repr__(self) -> str:
         return ""
 
-    def __call__(self, *args, sep: str = None) -> str:
+    def __call__(self, *args, sep: str | None = None) -> str:
         """
         调用后置语言选择器
         _[前置语言选择器]('内容')
@@ -40,7 +40,8 @@ class PreLocaleSelector:
         :param sep: 分隔符
         :return:
         """
-        frame = inspect.currentframe().f_back
+        current_frame = inspect.currentframe()
+        frame = current_frame.f_back if current_frame else None
         return self.i18n.t(*args, sep=sep or self.sep, frame=frame)[self.locale]
 
 
@@ -51,9 +52,9 @@ class LocaleContent(str):
         cls,
         *,
         text: str,
-        locales_dict: dict,
-        variables: dict = None,
-        locale: str = None,
+        locales_dict: dict[str, dict[str, str]],
+        variables: dict[str, object] | None = None,
+        locale: str | None = None,
         post_locale_selector: type["PostLocaleSelector"] | None = None,
     ):
         return str.__new__(cls, text)
@@ -62,9 +63,9 @@ class LocaleContent(str):
         self,
         *,
         text: str,
-        locales_dict: dict,
-        variables: dict = None,
-        locale: str = None,
+        locales_dict: dict[str, dict[str, str]],
+        variables: dict[str, object] | None = None,
+        locale: str | None = None,
         post_locale_selector: type["PostLocaleSelector"] | None = None,
     ):
         self._text = text
@@ -74,18 +75,24 @@ class LocaleContent(str):
         self._post_locale_selector = post_locale_selector or PostLocaleSelector
 
     def __str__(self) -> str:
-        return self.__getitem__(self._locale)
+        return self.__call__(self._locale)
 
     def __repr__(self) -> str:
-        return self.__getitem__(self._locale)
+        return self.__call__(self._locale)
 
-    def __getitem__(self, locale: int | slice | str) -> str:
+    @overload
+    def __getitem__(self, locale: SupportsIndex | slice) -> str: ...
+
+    @overload
+    def __getitem__(self, locale: str | None) -> str: ...
+
+    def __getitem__(self, locale: SupportsIndex | slice | str | None) -> str:
         """_('内容')[后置语言选择器]"""
-        if isinstance(locale, (int, slice)):
+        if isinstance(locale, (SupportsIndex, slice)):
             return super().__getitem__(locale)
         return self.__call__(locale)
 
-    def __call__(self, locale: int | slice | str):
+    def __call__(self, locale: str | None) -> str:
         """_('内容')(后置语言选择器)"""
         return str(
             self._post_locale_selector(
@@ -96,7 +103,7 @@ class LocaleContent(str):
             )
         )
 
-    def __int__(self):
+    def __int__(self) -> int:
         return int(self.__str__())
 
 
@@ -107,9 +114,9 @@ class PostLocaleSelector:
         self,
         *,
         text: str,
-        locales_dict: dict,
-        variables: dict = None,
-        locale: str = None,
+        locales_dict: dict[str, dict[str, str]],
+        variables: dict[str, object] | None = None,
+        locale: str | None = None,
     ):
         """
         语言选择器，用于选择翻译后的语言
@@ -143,18 +150,20 @@ class PostLocaleSelector:
             raw_string = raw_string.replace(v, str(self.variables[v]))
         return raw_string
 
-    def get_by_text(self, text: str, locale: str = None):
+    def get_by_text(self, text: str, locale: str | None = None) -> str:
+        if locale is None:
+            return text
         return self.locales_dict.get(locale, {}).get(gen_id(text), text)
 
 
 class I18n:
     def __init__(
         self,
-        enabled_locales: list[str] = None,
-        default_locale: str = None,
-        sep: str = None,
-        locales_dir: str | Path = None,
-        func_names: list[str] = None,
+        enabled_locales: list[str] | None = None,
+        default_locale: str | None = None,
+        sep: str | None = None,
+        locales_dir: str | Path | None = None,
+        func_names: list[str] | None = None,
         pre_locale_selector: type[PreLocaleSelector] | None = None,
         post_locale_selector: type[PostLocaleSelector] | None = None,
     ):
@@ -172,7 +181,7 @@ class I18n:
 
         self.default_locale = default_locale
         self.enabled_locales = enabled_locales
-        if self.enabled_locales and self.default_locale not in self.enabled_locales:
+        if self.enabled_locales and self.default_locale and self.default_locale not in self.enabled_locales:
             self.enabled_locales.append(self.default_locale)
 
         self.sep = sep or ic.sep
@@ -183,7 +192,7 @@ class I18n:
         self.content = LocaleContent
         self.locales_dict = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
 
-    def t(self, *args, sep: str = None, frame: FrameType = None) -> LocaleContent:
+    def t(self, *args, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent:
         """
         入口函数
 
@@ -236,7 +245,7 @@ class I18n:
         finally:
             del f
 
-    def _handle_cache(self, original: str, cache_key: str, result: StringData) -> LocaleContent:
+    def _handle_cache(self, original: str, cache_key: str, result: StringData | None) -> LocaleContent:
         """处理缓存并返回结果"""
         if not result:
             self._parse_failures.add(cache_key)
@@ -265,7 +274,8 @@ class I18n:
         """调用前置语言选择器"""
         return self.pre_locale_selector(i18n=self, locale=locale, sep=self.sep)
 
-    def __call__(self, *args, sep: str = None) -> LocaleContent:
+    def __call__(self, *args, sep: str | None = None) -> LocaleContent:
         """调用入口函数"""
-        frame = inspect.currentframe().f_back
+        current_frame = inspect.currentframe()
+        frame = current_frame.f_back if current_frame else None
         return self.t(*args, sep=sep or self.sep, frame=frame)

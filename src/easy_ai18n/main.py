@@ -15,9 +15,9 @@ from .utils import to_list
 class EasyAI18n:
     def __init__(
         self,
-        func_names: str | list[str] = None,
-        sep: str = None,
-        locales_dir: str | Path = None,
+        func_names: str | list[str] | None = None,
+        sep: str | None = None,
+        locales_dir: str | Path | None = None,
     ):
         """
         初始化 EasyAI18n 实例。
@@ -33,11 +33,11 @@ class EasyAI18n:
     def build(
         self,
         to_locales: str | list[str],
-        project_root: str | Path = None,
-        include: list[str] = None,
-        exclude: list[str] = None,
+        project_root: str | Path | None = None,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
-        max_concurrency: int = None,
+        max_concurrency: int | None = None,
         show_progress: bool = True,
     ):
         """
@@ -66,11 +66,11 @@ class EasyAI18n:
     async def build_async(
         self,
         to_locales: str | list[str],
-        project_root: str | Path = None,
-        include: list[str] = None,
-        exclude: list[str] = None,
+        project_root: str | Path | None = None,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
-        max_concurrency: int = None,
+        max_concurrency: int | None = None,
         show_progress: bool = True,
     ):
         """
@@ -100,8 +100,8 @@ class EasyAI18n:
 
     def i18n(
         self,
-        default_locale: str = None,
-        enabled_locales: str | list[str] = None,
+        default_locale: str | None = None,
+        enabled_locales: str | list[str] | None = None,
         pre_locale_selector: type[PreLocaleSelector] | None = None,
         post_locale_selector: type[PostLocaleSelector] | None = None,
     ) -> I18n:

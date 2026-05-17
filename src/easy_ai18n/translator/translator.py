@@ -80,7 +80,10 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
         except Exception as e:
             raise TranslationError(f"OpenAI翻译错误: {e}") from e
         else:
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+            if content is None:
+                raise TranslationError("OpenAI翻译结果为空")
+            return content
 
 
 class TranslatorResult(BaseModel):
@@ -126,7 +129,8 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
                 temperature=0,
             )
         except InstructorRetryException as e:
-            raise TranslationError(f"OpenAI翻译结果验证错误: {e.messages[-1]['content']}") from e
+            message = e.messages[-1]["content"] if e.messages else str(e)
+            raise TranslationError(f"OpenAI翻译结果验证错误: {message}") from e
         except Exception as e:
             raise TranslationError(f"OpenAI翻译错误: {e}") from e
         else:

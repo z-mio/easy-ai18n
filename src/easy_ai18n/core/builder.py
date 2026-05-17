@@ -25,13 +25,13 @@ class Builder:
         to_locales: list[str] = None,
         sep: str = None,
         func_names: list[str] = None,
-        project_root: str = None,
-        locales_dir: str | Path = None,
-        include: list[str] = None,
-        exclude: list[str] = None,
+        project_root: str | Path | None = None,
+        locales_dir: str | Path | None = None,
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
         show_progress: bool = True,
-        max_concurrency: int = None,
+        max_concurrency: int | None = None,
     ):
         """
         初始化Builder
@@ -56,7 +56,7 @@ class Builder:
             raise ValueError("构建失败: to_locales 未配置")
         self.to_locales = to_locales
         self.locales_dir = to_path(locales_dir) or ic.locales_dir
-        self.translator = translator or GoogleTranslator()
+        self.translator: BaseItemTranslator | BaseBulkTranslator = translator or GoogleTranslator()
 
         self.project_files = self.load_file()
         self.show_progress = show_progress
@@ -204,7 +204,7 @@ class Builder:
         updated_locale_dict, to_be_translated = self.check_chage(log=False)
         return bool(updated_locale_dict != self._locales_dict or to_be_translated)
 
-    async def item_translate(self, text_id_dict: dict[str, str], to_locale: str = None) -> dict[str, str]:
+    async def item_translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
         """
         逐条翻译
         :param text_id_dict: 待翻译的字符串字典 {id: text}
@@ -215,10 +215,13 @@ class Builder:
         pbar = self.pbar(to_locale, len(text_id_dict))
 
         semaphore = asyncio.Semaphore(self.max_concurrency)
+        translator = self.translator
+        if not isinstance(translator, BaseItemTranslator):
+            raise ValueError("错误的翻译器类型")
 
         async def _translate_one(text: str, locale: str, sem: asyncio.Semaphore) -> str:
             async with sem:
-                translated = await self.translator.translate(text, locale)
+                translated = await translator.translate(text, locale)
                 pbar.update()
                 return translated
 
@@ -239,24 +242,27 @@ class Builder:
 
         return result
 
-    async def bulk_translation(self, text_id_dict: dict[str, str], to_locale: str = None) -> dict[str, str]:
+    async def bulk_translation(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
         """
         整体翻译
         :param text_id_dict:
         :param to_locale:
         :return:
         """
+        translator = self.translator
+        if not isinstance(translator, BaseBulkTranslator):
+            raise ValueError("错误的翻译器类型")
         with self.pbar(to_locale, 1) as pbar:
-            all_results = {}
+            all_results: dict[str, str] = {}
             items = list(text_id_dict.items())
             for i in range(0, len(items), self.max_concurrency):
                 batch = dict(items[i : i + self.max_concurrency])
-                batch_results = await self.translator.translate(batch, to_locale)
+                batch_results = await translator.translate(batch, to_locale)
                 all_results |= batch_results
             pbar.update()
         return all_results
 
-    async def translate(self, text_list: dict[str, str], to_locale: str = None) -> dict[str, str]:
+    async def translate(self, text_list: dict[str, str], to_locale: str) -> dict[str, str]:
         if isinstance(self.translator, BaseItemTranslator):
             return await self.item_translate(text_list, to_locale)
         elif isinstance(self.translator, BaseBulkTranslator):
