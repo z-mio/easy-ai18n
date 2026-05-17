@@ -175,8 +175,8 @@ class I18n:
         if self.enabled_locales and self.default_locale not in self.enabled_locales:
             self.enabled_locales.append(self.default_locale)
 
-        self.sep = sep or ic.def_sep
-        self.locales_dir = locales_dir or ic.i18n_dir
+        self.sep = sep or ic.sep
+        self.locales_dir = locales_dir or ic.locales_dir
         self.func_names = func_names or ic.func_names
         self.pre_locale_selector = pre_locale_selector or PreLocaleSelector
         self.post_locale_selector = post_locale_selector or PostLocaleSelector
