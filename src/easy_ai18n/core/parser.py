@@ -362,23 +362,22 @@ class ASTParser:
     def extract(
         self,
         *,
-        frame: FrameType = None,
-        call_node: ast.Call = None,
+        frame: FrameType | None = None,
+        call_node: ast.Call | None = None,
     ) -> StringData | None:
         """
         解析第一个匹配的调用节点，并返回构造后的字符串及变量数据。
         """
         # 节点解析的性能开销大, 尽量使用缓存
-        if not call_node:
+        if call_node is None:
             if frame is None:
                 return None
             call_text = self.get_code_block(frame)
             node = ast.parse(call_text.strip())
             target_nodes = self.get_target_nodes(node)
-            if target_nodes:
-                call_node = target_nodes[0]
-            else:
+            if not target_nodes:
                 return None
+            call_node = target_nodes[0]
 
         string_constructor = StringConstructor(sep=self.sep, func_names=self.func_names)
         constructed, vars_found = string_constructor.construct_from_node(

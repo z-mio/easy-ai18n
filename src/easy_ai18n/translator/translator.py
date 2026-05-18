@@ -28,15 +28,15 @@ class GoogleTranslator(BaseItemTranslator):
         except Exception as e:
             raise TranslationError(f"谷歌翻译错误: {e}") from e
         else:
-            return result.text
+            return str(result.text)
 
 
 class BaseOpenAITranslator:
     def __init__(
         self,
-        api_key: str = None,
-        base_url: str = None,
-        model: str = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -52,9 +52,9 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
 
     def __init__(
         self,
-        api_key: str = None,
-        base_url: str = None,
-        model: str = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
         """
@@ -96,9 +96,9 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
 
     def __init__(
         self,
-        api_key: str = None,
-        base_url: str = None,
-        model: str = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
         """

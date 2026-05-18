@@ -22,9 +22,9 @@ from .parser import ASTParser, StringData
 class Builder:
     def __init__(
         self,
-        to_locales: list[str] = None,
-        sep: str = None,
-        func_names: list[str] = None,
+        to_locales: list[str] | None = None,
+        sep: str | None = None,
+        func_names: list[str] | None = None,
         project_root: str | Path | None = None,
         locales_dir: str | Path | None = None,
         include: list[str] | None = None,
