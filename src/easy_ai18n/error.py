@@ -12,3 +12,7 @@ class FormatError(Exception):
 
 class EvaluateError(Exception):
     pass
+
+
+class UnsupportedSyntaxError(Exception):
+    pass

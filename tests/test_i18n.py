@@ -1,20 +1,69 @@
 import os
 
+import pytest
+
 from easy_ai18n import EasyAI18n
+from easy_ai18n.error import UnsupportedSyntaxError
+from easy_ai18n.translator import BaseItemTranslator
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
 
 
+class SameTextTranslator(BaseItemTranslator):
+    async def translate(self, text: str, target_lang: str) -> str:
+        return text
+
 
 def test_build(tmp_path):
     i18n = EasyAI18n(locales_dir=tmp_path)
-    i18n.build(project_root='tests', to_locales=["en", "ja"], include=["test_i18n.py"])
+    i18n.build(project_root="tests", to_locales=["en", "ja"], include=["test_i18n.py"])
     assert i18n.locales_dir.joinpath("en.yaml").exists()
     assert i18n.locales_dir.joinpath("ja.yaml").exists()
 
 
+def test_build_rejects_await_in_f_string(tmp_path):
+    source = tmp_path / "await_in_f_string.py"
+    source.write_text(
+        "async def demo(_):\n    _(f'name: {await get_name()}')\n",
+        encoding="utf-8",
+    )
+
+    i18n = EasyAI18n(locales_dir=tmp_path / "locales")
+    with pytest.raises(UnsupportedSyntaxError, match="不支持在 f-string 中使用 await") as exc_info:
+        i18n.build(
+            project_root=tmp_path,
+            to_locales=["en"],
+            include=[source.name],
+            translator=SameTextTranslator(),
+            show_progress=False,
+        )
+
+    message = str(exc_info.value)
+    assert str(source) in message
+    assert "await get_name()" in message
+
+
+def test_build_allows_await_before_f_string(tmp_path):
+    source = tmp_path / "await_before_f_string.py"
+    source.write_text(
+        "async def demo(_):\n    name = await get_name()\n    _(f'name: {name}')\n",
+        encoding="utf-8",
+    )
+
+    i18n = EasyAI18n(locales_dir=tmp_path / "locales")
+    i18n.build(
+        project_root=tmp_path,
+        to_locales=["en"],
+        include=[source.name],
+        translator=SameTextTranslator(),
+        show_progress=False,
+    )
+
+    assert i18n.locales_dir.joinpath("en.yaml").exists()
+
+
 def test_basic():
-    i18n = EasyAI18n(locales_dir='tests/i18n')
+    i18n = EasyAI18n(locales_dir="tests/i18n")
     _ = i18n.i18n()
 
     # 普通测试

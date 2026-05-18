@@ -9,10 +9,11 @@ import ast
 import inspect
 from dataclasses import dataclass
 from functools import cache
+from pathlib import Path
 from types import FrameType
 from typing import Any
 
-from ..error import EvaluateError, FormatError
+from ..error import EvaluateError, FormatError, UnsupportedSyntaxError
 
 
 @dataclass
@@ -57,6 +58,44 @@ class CallVisitor(ast.NodeVisitor):
             self.nodes.append(new_call)
         # 深入其他可能的子节点
         self.generic_visit(node)
+
+
+class UnsupportedSyntaxValidator:
+    def __init__(self, source_path: Path | None = None, source: str | None = None):
+        self.source_path = source_path
+        self.source_lines = source.splitlines() if source else []
+
+    def validate_call(self, call_node: ast.Call) -> None:
+        for node in call_node.args:
+            self._validate_node(node)
+        for keyword in call_node.keywords:
+            self._validate_node(keyword.value)
+
+    def _validate_node(self, node: ast.AST) -> None:
+        for sub_node in ast.walk(node):
+            if not isinstance(sub_node, ast.JoinedStr):
+                continue
+            for value in sub_node.values:
+                if not isinstance(value, ast.FormattedValue):
+                    continue
+                if any(isinstance(child, ast.Await) for child in ast.walk(value.value)):
+                    self._raise_unsupported(value.value)
+
+    def _raise_unsupported(self, node: ast.AST) -> None:
+        location = self._location(node)
+        message = f"构建失败: 不支持在 f-string 中使用 await{location}\n请先执行 await，再将结果传入 f-string。"
+        raise UnsupportedSyntaxError(message)
+
+    def _location(self, node: ast.AST) -> str:
+        lineno = getattr(node, "lineno", None)
+        col_offset = getattr(node, "col_offset", None)
+        if not self.source_path or lineno is None or col_offset is None:
+            return ""
+        line = ""
+        if self.source_lines and lineno <= len(self.source_lines):
+            line = self.source_lines[lineno - 1].strip()
+        location = f"\nfile: {self.source_path}:{lineno}:{col_offset + 1}"
+        return f"{location}\ncode: {line}" if line else location
 
 
 class StringConstructor:
@@ -297,7 +336,13 @@ class ASTParser:
         parts.append(lines_bytes[end_lineno][:col_end])
         return "".join(segment.decode("utf-8") for segment in parts)
 
-    def extract_all(self, *, node: ast.AST) -> list[StringData]:
+    def extract_all(
+        self,
+        *,
+        node: ast.AST,
+        source_path: Path | None = None,
+        source: str | None = None,
+    ) -> list[StringData]:
         """
         仅提取解析后的字符串，默认只解析第一个匹配的调用节点。
         """
@@ -306,8 +351,10 @@ class ASTParser:
             return []
 
         results = []
+        validator = UnsupportedSyntaxValidator(source_path, source)
         string_constructor = StringConstructor(sep=self.sep, func_names=self.func_names)
         for call_node in target_nodes:
+            validator.validate_call(call_node)
             constructed, vars_found = string_constructor.construct_from_node(call_node, None)
             results.append(StringData(constructed, vars_found, call_node))
         return results

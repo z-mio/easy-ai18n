@@ -276,8 +276,13 @@ class Builder:
         :param file: 文件路径
         :return:
         """
-        module = ast.parse(file.read_text(encoding="utf-8"))
-        return ASTParser(sep=self.sep, func_names=self.func_names).extract_all(node=module)
+        source = file.read_text(encoding="utf-8")
+        module = ast.parse(source)
+        return ASTParser(sep=self.sep, func_names=self.func_names).extract_all(
+            node=module,
+            source_path=file,
+            source=source,
+        )
 
     def save_to_yaml(self, locale_dict: dict, locale: str):
         """
