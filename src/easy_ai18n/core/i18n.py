@@ -6,7 +6,7 @@ import inspect
 import sys
 from pathlib import Path
 from types import FrameType
-from typing import TYPE_CHECKING, SupportsIndex, overload
+from typing import TYPE_CHECKING, Self, SupportsIndex, overload
 
 from ..config import ic
 from ..log import logger
@@ -32,7 +32,7 @@ class PreLocaleSelector:
     def __repr__(self) -> str:
         return ""
 
-    def __call__(self, *args, sep: str | None = None) -> str:
+    def __call__(self, *args: object, sep: str | None = None) -> str:
         """
         调用后置语言选择器
         _[前置语言选择器]('内容')
@@ -56,7 +56,7 @@ class LocaleContent(str):
         variables: dict[str, object] | None = None,
         locale: str | None = None,
         post_locale_selector: type["PostLocaleSelector"] | None = None,
-    ):
+    ) -> Self:
         return str.__new__(cls, text)
 
     def __init__(
@@ -166,7 +166,7 @@ class I18n:
         func_names: list[str] | None = None,
         pre_locale_selector: type[PreLocaleSelector] | None = None,
         post_locale_selector: type[PostLocaleSelector] | None = None,
-    ):
+    ) -> None:
         """
         初始化I18n
         :param enabled_locales: 要启用的语言
@@ -192,7 +192,7 @@ class I18n:
         self.content = LocaleContent
         self.locales_dict = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
 
-    def t(self, *args, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent:
+    def t(self, *args: object, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent:
         """
         入口函数
 
@@ -265,7 +265,7 @@ class I18n:
             post_locale_selector=self.post_locale_selector,
         )
 
-    def clear_cache(self):
+    def clear_cache(self) -> None:
         """清除解析缓存"""
         self._cache.clear()
         self._parse_failures.clear()
@@ -274,7 +274,7 @@ class I18n:
         """调用前置语言选择器"""
         return self.pre_locale_selector(i18n=self, locale=locale, sep=self.sep)
 
-    def __call__(self, *args, sep: str | None = None) -> LocaleContent:
+    def __call__(self, *args: object, sep: str | None = None) -> LocaleContent:
         """调用入口函数"""
         current_frame = inspect.currentframe()
         frame = current_frame.f_back if current_frame else None

@@ -39,7 +39,7 @@ class EasyAI18n:
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
         max_concurrency: int | None = None,
         show_progress: bool = True,
-    ):
+    ) -> None:
         """
         构建翻译文件
         :param to_locales: 要翻译到的目标语言
@@ -72,7 +72,7 @@ class EasyAI18n:
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
         max_concurrency: int | None = None,
         show_progress: bool = True,
-    ):
+    ) -> None:
         """
         异步构建翻译文件
         :param to_locales: 要翻译到的目标语言

@@ -1,8 +1,9 @@
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
 
 
-def gen_id(text) -> str:
+def gen_id(text: object) -> str:
     """
     生成唯一ID
     :param text: 输入字符串
@@ -12,10 +13,10 @@ def gen_id(text) -> str:
     return hashlib.md5(text).hexdigest()[:12]
 
 
-def singleton(cls):
-    instances = {}
+def singleton[T, **P](cls: Callable[P, T]) -> Callable[P, T]:
+    instances: dict[Callable[P, T], T] = {}
 
-    def get_instance(*args, **kwargs):
+    def get_instance(*args: P.args, **kwargs: P.kwargs) -> T:
         if cls not in instances:
             instances[cls] = cls(*args, **kwargs)
         return instances[cls]
@@ -23,7 +24,7 @@ def singleton(cls):
     return get_instance
 
 
-def to_list(obj):
+def to_list[T](obj: T | list[T] | None) -> list[T]:
     if isinstance(obj, list):
         return obj
     elif obj is None:
@@ -32,7 +33,7 @@ def to_list(obj):
         return [obj]
 
 
-def to_path(path):
+def to_path(path: str | Path | None) -> Path | None:
     if isinstance(path, str):
         return Path(path)
     elif path is None:
@@ -40,4 +41,4 @@ def to_path(path):
     elif isinstance(path, Path):
         return path
     else:
-        return path
+        return Path(str(path))

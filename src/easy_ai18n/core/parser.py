@@ -28,7 +28,7 @@ class CallVisitor(ast.NodeVisitor):
         self.func_names = func_names
         self.nodes: list[ast.Call] = []
 
-    def visit_Call(self, node: ast.Call):
+    def visit_Call(self, node: ast.Call) -> None:
         func = node.func
         # 后置选择器: _()
         if isinstance(func, ast.Name) and func.id in self.func_names:
@@ -178,7 +178,7 @@ class StringConstructor:
         return "".join(parts), variables
 
     @staticmethod
-    def _handle_conversion(conversion):
+    def _handle_conversion(conversion: int) -> str | None:
         """
         处理转换标志
         :param conversion:

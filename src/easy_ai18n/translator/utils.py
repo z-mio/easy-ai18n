@@ -1,4 +1,7 @@
-def build_messages(prompt, content) -> list:
+from openai.types.chat import ChatCompletionMessageParam
+
+
+def build_messages(prompt: str, content: str) -> list[ChatCompletionMessageParam]:
     return [
         {
             "role": "system",

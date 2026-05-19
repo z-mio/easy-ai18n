@@ -7,6 +7,7 @@ import asyncio
 import copy
 import os
 from pathlib import Path
+from typing import Any
 
 import yaml
 from tqdm import tqdm
@@ -115,7 +116,7 @@ class Builder:
                 self.save_to_yaml(updated_locales_dict[locale], locale)
         return True
 
-    def check_chage(self, log: bool = True) -> tuple[dict[str, dict], dict[str, list[StringData]]]:
+    def check_chage(self, log: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
         """
         检查差异
         :return: 移除过期翻译后的字典, 新增内容字典
@@ -163,8 +164,8 @@ class Builder:
                 lg(f"过期内容: {locale} - {trans_id}")
         return updated_locales_dict, to_be_translated
 
-    def load_file(self):
-        project_files = []
+    def load_file(self) -> list[Path]:
+        project_files: list[Path] = []
         include_paths = [Path(p) for p in self.include] if self.include else []
         exclude_paths = [Path(p) for p in self.exclude]
 
@@ -284,7 +285,7 @@ class Builder:
             source=source,
         )
 
-    def save_to_yaml(self, locale_dict: dict, locale: str):
+    def save_to_yaml(self, locale_dict: dict[str, str], locale: str) -> None:
         """
         将翻译结果输出到文件
         :param locale_dict: 翻译结果字典
@@ -295,7 +296,7 @@ class Builder:
             yaml.dump(locale_dict, f, allow_unicode=True)
 
     @staticmethod
-    def locales_dict_to_id_dict(locales_dict: dict) -> dict[str, list[str]]:
+    def locales_dict_to_id_dict(locales_dict: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
         """
         获取 locales 字典中的所有id
         :return:
@@ -304,12 +305,9 @@ class Builder:
         if not locales_dict:
             return {}
 
-        locales_id_dict = locales_dict.copy()
-        for locale in locales_id_dict:
-            locales_id_dict[locale] = list(locales_id_dict[locale])
-        return locales_id_dict
+        return {locale: list(locale_dict) for locale, locale_dict in locales_dict.items()}
 
-    def pbar(self, locale: str, total: int):
+    def pbar(self, locale: str, total: int) -> tqdm:
         return tqdm(
             total=total,
             desc=f"⏳ 翻译中 → {locale}",
