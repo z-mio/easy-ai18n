@@ -3,7 +3,7 @@ import os
 import pytest
 
 from easy_ai18n import EasyAI18n
-from easy_ai18n.error import UnsupportedSyntaxError
+from easy_ai18n.errors import UnsupportedSyntaxError
 from easy_ai18n.translator import BaseItemTranslator
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
@@ -16,7 +16,13 @@ class SameTextTranslator(BaseItemTranslator):
 
 def test_build(tmp_path):
     i18n = EasyAI18n(locales_dir=tmp_path)
-    i18n.build(project_root="tests", to_locales=["en", "ja"], include=["test_i18n.py"])
+    i18n.build(
+        project_root="tests",
+        to_locales=["en", "ja"],
+        include=["test_i18n.py"],
+        translator=SameTextTranslator(),
+        show_progress=False,
+    )
     assert i18n.locales_dir.joinpath("en.yaml").exists()
     assert i18n.locales_dir.joinpath("ja.yaml").exists()
 

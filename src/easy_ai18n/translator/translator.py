@@ -2,33 +2,50 @@
 翻译器
 """
 
+import asyncio
 import os
 from pprint import PrettyPrinter
 
-import instructor
-from googletrans import Translator as Gt
-from instructor.core import InstructorRetryException
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
-from tenacity import retry, stop_after_attempt, wait_fixed
 
-from ..error import TranslationError
-from ..prompts.translate import TRANSLATE_PROMPT
+from ..errors import BuildDependencyError, TranslationError
 from .base import BaseBulkTranslator, BaseItemTranslator
-from .utils import build_messages
+
+try:
+    import instructor
+    from googletrans import Translator as Gt
+    from instructor.core import InstructorRetryException
+    from openai import AsyncOpenAI
+except ImportError as e:
+    raise BuildDependencyError() from e
+
+DEFAULT_REFERENCE = (
+    "You can adjust the tone and style, taking into account the cultural connotations "
+    "and regional differences of certain words. As a translator, you need to translate "
+    "the original text into a translation that meets the standards of accuracy and elegance."
+)
+
+TRANSLATE_PROMPT = f"""
+Translate the text to the specified language
+Here are some reference to help with better translation.  ---{DEFAULT_REFERENCE}---
+Don't add anything extra, and don't modify python variables inside the text
+"""
 
 
 class GoogleTranslator(BaseItemTranslator):
     """谷歌翻译"""
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(1.5))
     async def translate(self, text: str, target_lang: str) -> str:
-        try:
-            result = await Gt().translate(text, dest=target_lang)
-        except Exception as e:
-            raise TranslationError(f"谷歌翻译错误: {e}") from e
-        else:
-            return str(result.text)
+        last_exc: Exception | None = None
+        for _ in range(3):
+            try:
+                result = await Gt().translate(text, dest=target_lang)
+            except Exception as e:
+                last_exc = e
+                await asyncio.sleep(1.5)
+            else:
+                return str(result.text)
+        raise TranslationError(f"谷歌翻译错误: {last_exc}") from last_exc
 
 
 class BaseOpenAITranslator:
@@ -66,24 +83,36 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
         BaseOpenAITranslator.__init__(self, api_key, base_url, model, prompt)
         self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(1.5))
     async def translate(self, text: str, target_lang: str) -> str:
         """
         gpt翻译
         """
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=build_messages(self.prompt, f"Translate the text to {target_lang}:\n{text}"),
-                temperature=0,
-            )
-        except Exception as e:
-            raise TranslationError(f"OpenAI翻译错误: {e}") from e
-        else:
-            content = response.choices[0].message.content
-            if content is None:
-                raise TranslationError("OpenAI翻译结果为空")
-            return content
+        last_exc: Exception | None = None
+        for _ in range(3):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": self.prompt,
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Translate the text to {target_lang}:\n{text}",
+                        },
+                    ],
+                    temperature=0,
+                )
+            except Exception as e:
+                last_exc = e
+                await asyncio.sleep(1.5)
+            else:
+                content = response.choices[0].message.content
+                if content is None:
+                    raise TranslationError("OpenAI翻译结果为空")
+                return content
+        raise TranslationError(f"OpenAI翻译错误: {last_exc}") from last_exc
 
 
 class TranslatorResult(BaseModel):
@@ -120,10 +149,16 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
             text = PrettyPrinter().pformat(text_id_dict)
             response = await self.client.chat.completions.create(
                 model=self.model,
-                messages=build_messages(
-                    self.prompt,
-                    f"Translate the text to {target_lang}:\n{text}",
-                ),
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self.prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Translate the text to {target_lang}:\n{text}",
+                    },
+                ],
                 response_model=list[TranslatorResult],
                 max_retries=3,
                 temperature=0,

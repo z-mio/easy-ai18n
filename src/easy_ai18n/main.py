@@ -1,14 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 from pathlib import Path
 
 from .config import ic
-from .core import (
-    Builder,
-    I18n,
-    PostLocaleSelector,
-    PreLocaleSelector,
-)
-from .translator import BaseBulkTranslator, BaseItemTranslator
+from .core.i18n import I18n, PostLocaleSelector, PreLocaleSelector
+from .translator.base import BaseBulkTranslator, BaseItemTranslator
 from .utils import to_list
 
 
@@ -84,6 +81,8 @@ class EasyAI18n:
         :param show_progress: 是否显示翻译进度条
         :return:
         """
+        from .core.builder import Builder
+
         builder = Builder(
             to_locales=to_list(to_locales),
             sep=self.sep,

@@ -8,8 +8,9 @@ from pathlib import Path
 from types import FrameType
 from typing import TYPE_CHECKING, Self, SupportsIndex, overload
 
+from loguru import logger
+
 from ..config import ic
-from ..log import logger
 from ..utils import gen_id
 from .loader import Loader
 from .parser import ASTParser, StringData

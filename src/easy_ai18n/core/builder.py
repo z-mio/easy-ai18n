@@ -2,22 +2,28 @@
 翻译字典构建器
 """
 
+from __future__ import annotations
+
 import ast
 import asyncio
 import copy
 import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
-from tqdm import tqdm
+from loguru import logger
 
 from ..config import ic
-from ..log import logger
-from ..translator import BaseBulkTranslator, BaseItemTranslator, GoogleTranslator
+from ..errors import BuildDependencyError
+from ..translator import GoogleTranslator
+from ..translator.base import BaseBulkTranslator, BaseItemTranslator
 from ..utils import gen_id, to_path
 from .loader import Loader
 from .parser import ASTParser, StringData
+
+if TYPE_CHECKING:
+    from tqdm import tqdm
 
 
 class Builder:
@@ -308,6 +314,11 @@ class Builder:
         return {locale: list(locale_dict) for locale, locale_dict in locales_dict.items()}
 
     def pbar(self, locale: str, total: int) -> tqdm:
+        try:
+            from tqdm import tqdm
+        except ImportError as e:
+            raise BuildDependencyError() from e
+
         return tqdm(
             total=total,
             desc=f"⏳ 翻译中 → {locale}",

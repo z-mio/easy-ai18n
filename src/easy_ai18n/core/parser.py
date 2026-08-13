@@ -13,7 +13,7 @@ from pathlib import Path
 from types import FrameType
 from typing import Any
 
-from ..error import EvaluateError, FormatError, UnsupportedSyntaxError
+from ..errors import EvaluateError, FormatError, UnsupportedSyntaxError
 
 
 @dataclass

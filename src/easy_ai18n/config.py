@@ -1,10 +1,6 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 
 class I18nConfig:
     func_names: list[str] = ["_"]
