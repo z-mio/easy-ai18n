@@ -72,13 +72,16 @@ class Builder:
 
     async def run(self) -> None:
         if not self.is_changed():
-            return logger.info("内容无更新")
+            logger.info("内容无更新")
+            return
 
         logger.info("内容有更新, 开始更新...")
         if await self.build():
-            return logger.success("更新完成")
+            logger.success("更新完成")
+            return
         else:
-            return logger.exception("构建失败:")
+            logger.error("构建失败")
+            return
 
     async def build(self, save_to_file: bool = True) -> bool:
         """
@@ -86,7 +89,7 @@ class Builder:
         :param save_to_file: 是否保存到文件
         :return:
         """
-        updated_locales_dict, to_be_translated = self.check_chage()
+        updated_locales_dict, to_be_translated = self.check_changes()
 
         for locale, sd_list in to_be_translated.items():
             try:
@@ -122,7 +125,7 @@ class Builder:
                 self.save_to_yaml(updated_locales_dict[locale], locale)
         return True
 
-    def check_chage(self, log: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
+    def check_changes(self, log: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
         """
         检查差异
         :return: 移除过期翻译后的字典, 新增内容字典
@@ -208,7 +211,7 @@ class Builder:
         :return:
         """
 
-        updated_locale_dict, to_be_translated = self.check_chage(log=False)
+        updated_locale_dict, to_be_translated = self.check_changes(log=False)
         return bool(updated_locale_dict != self._locales_dict or to_be_translated)
 
     async def item_translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:

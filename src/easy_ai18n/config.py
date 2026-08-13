@@ -9,7 +9,7 @@ class I18nConfig:
     locales_dir: Path = Path(os.getcwd()) / "i18n"
     """语言文件存放目录"""
 
-    sep = " "
+    sep: str = " "
     """默认分隔符"""
 
 

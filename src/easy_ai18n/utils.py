@@ -27,7 +27,5 @@ def to_path(path: str | Path | None) -> Path | None:
 
     if isinstance(path, str):
         return Path(path)
-    elif isinstance(path, Path):
-        return path
     else:
-        return None
+        return path

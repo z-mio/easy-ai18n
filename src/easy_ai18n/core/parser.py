@@ -13,7 +13,7 @@ from pathlib import Path
 from types import FrameType
 from typing import Any
 
-from ..errors import EvaluateError, FormatError, UnsupportedSyntaxError
+from ..errors import EvaluationError, FormatError, UnsupportedSyntaxError
 
 
 @dataclass
@@ -243,7 +243,7 @@ class VariableEvaluator:
             except Exception as e:
                 raise FormatError(e) from e
         except Exception as e:
-            raise EvaluateError(e) from e
+            raise EvaluationError(e) from e
 
     def _evaluate_basic(self, expr: str) -> object:
         """基础求值"""
