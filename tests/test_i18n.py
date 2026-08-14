@@ -2,9 +2,8 @@ import os
 
 import pytest
 
-from easy_ai18n import EasyAI18n
+from easy_ai18n import EasyAI18n, BaseItemTranslator
 from easy_ai18n.errors import UnsupportedSyntaxError
-from easy_ai18n.translator import BaseItemTranslator
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
 

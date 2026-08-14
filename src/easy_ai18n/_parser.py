@@ -16,7 +16,7 @@ from pathlib import Path
 from types import FrameType
 from typing import Any
 
-from ..errors import EvaluationError, FormatError, UnsupportedSyntaxError
+from .errors import EvaluationError, FormatError, UnsupportedSyntaxError
 
 
 @dataclass

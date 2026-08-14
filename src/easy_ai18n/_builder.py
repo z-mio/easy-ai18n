@@ -14,13 +14,12 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from loguru import logger
 
-from ..config import i18n_config
-from ..errors import BuildDependencyError, BuildError, TranslationError
-from ..translator import GoogleTranslator
-from ..translator.base import BaseBulkTranslator, BaseItemTranslator
-from ..utils import generate_id, to_path
-from .loader import Loader
-from .parser import ASTParser, StringData
+from ._config import i18n_config
+from ._loader import Loader
+from ._parser import ASTParser, StringData
+from ._utils import generate_id, to_path
+from .errors import BuildDependencyError, BuildError, TranslationError
+from .translators import BaseBulkTranslator, BaseItemTranslator, GoogleTranslator
 
 if TYPE_CHECKING:
     from tqdm import tqdm
