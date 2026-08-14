@@ -65,7 +65,7 @@ class Builder:
         self.func_names = func_names or ic.func_names
         self.sep = sep or ic.sep
         if to_locales is None:
-            raise ValueError("构建失败: to_locales 未配置")
+            raise ValueError("Build failed: to_locales is not configured")
         self.to_locales = to_locales
         self.locales_dir = to_path(locales_dir) or ic.locales_dir
         self.translator: BaseItemTranslator | BaseBulkTranslator = translator or GoogleTranslator()
@@ -77,15 +77,15 @@ class Builder:
 
     async def run(self) -> None:
         if not self.is_changed():
-            logger.info("内容无更新")
+            logger.info("Content unchanged, skipping build")
             return
 
-        logger.info("内容有更新, 开始更新...")
+        logger.info("Content changed, updating...")
         if await self.build():
-            logger.success("更新完成")
+            logger.success("Update complete")
             return
         else:
-            logger.error("构建失败")
+            logger.error("Build failed")
             return
 
     async def build(self, save_to_file: bool = True) -> bool:
@@ -127,7 +127,7 @@ class Builder:
                             text = text.replace(f"{{{{{i}}}}}", var)
                         trans_result[k] = text
             except Exception:
-                logger.exception(f"翻译到 {locale} 失败:")
+                logger.exception(f"Translation to {locale} failed:")
             else:
                 updated_locales_dict.setdefault(locale, {})
                 updated_locales_dict[locale] |= trans_result
@@ -166,12 +166,12 @@ class Builder:
         for locale in self.to_locales:
             if locale not in updated_locales_dict:
                 updated_locales_dict.setdefault(locale, {})
-                lg(f"新语言: {locale}")
+                lg(f"New locale: {locale}")
         # 移除过期语言
         for locale in list(self._locales_dict.keys()):
             if locale not in self.to_locales and locale in updated_locales_dict:
                 del updated_locales_dict[locale]
-                lg(f"过期语言: {locale}")
+                lg(f"Stale locale: {locale}")
         updated_locales_id_dict = self.locales_dict_to_id_dict(updated_locales_dict)
         # 添加新翻译
         for trans_id, sd in str_id_dict.items():
@@ -183,7 +183,7 @@ class Builder:
                 if sd.string not in to_be_translated[locale]:
                     to_be_translated[locale].append(sd)
 
-                lg(f"新内容: {locale} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}")
+                lg(f"New text: {locale} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}")
         # 移除过期翻译
         for locale in updated_locales_id_dict:
             for trans_id in list(updated_locales_id_dict[locale]):
@@ -192,7 +192,7 @@ class Builder:
                 if trans_id not in updated_locales_dict[locale]:
                     continue
                 del updated_locales_dict[locale][trans_id]
-                lg(f"过期内容: {locale} - {trans_id}")
+                lg(f"Stale text: {locale} - {trans_id}")
         return updated_locales_dict, to_be_translated
 
     def load_file(self) -> list[Path]:
@@ -254,7 +254,7 @@ class Builder:
         semaphore = asyncio.Semaphore(self.max_concurrency)
         translator = self.translator
         if not isinstance(translator, BaseItemTranslator):
-            raise ValueError("错误的翻译器类型")
+            raise ValueError("Invalid translator type")
 
         async def _translate_one(text: str, locale: str, sem: asyncio.Semaphore) -> str:
             async with sem:
@@ -273,7 +273,7 @@ class Builder:
             try:
                 translated_text = task.result()
             except Exception:
-                logger.exception(f"→ [{to_locale}] 翻译失败 (id={key}, text={text_id_dict[key]}):")
+                logger.exception(f"→ [{to_locale}] Translation failed (id={key}, text={text_id_dict[key]}):")
             else:
                 result[key] = translated_text
 
@@ -291,7 +291,7 @@ class Builder:
         """
         translator = self.translator
         if not isinstance(translator, BaseBulkTranslator):
-            raise ValueError("错误的翻译器类型")
+            raise ValueError("Invalid translator type")
         with self.pbar(to_locale, 1) as pbar:
             all_results: dict[str, str] = {}
             items = list(text_id_dict.items())
@@ -308,7 +308,7 @@ class Builder:
         elif isinstance(self.translator, BaseBulkTranslator):
             return await self.bulk_translation(text_list, to_locale)
         else:
-            raise ValueError("错误的翻译器类型")
+            raise ValueError("Invalid translator type")
 
     def extract_strings(self, file: Path) -> list[StringData]:
         """Extract all translatable strings from a Python file.
@@ -363,8 +363,8 @@ class Builder:
 
         return tqdm(
             total=total,
-            desc=f"⏳ 翻译中 → {locale}",
-            unit="条",
+            desc=f"⏳ Translating → {locale}",
+            unit="items",
             ncols=80,
             bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
             colour="blue",

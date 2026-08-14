@@ -293,7 +293,7 @@ class I18n:
             result = ASTParser(sep=sep, func_names=self.func_names).extract(frame=f, call_node=call_node)
             return self._handle_cache(original, cache_key, result)
         except Exception:
-            logger.exception("I18N解析错误")
+            logger.exception("I18N parse error")
             self._parse_failures.add(cache_key)
             return self.content(
                 text=original,
@@ -321,7 +321,7 @@ class I18n:
         """
         if not result:
             self._parse_failures.add(cache_key)
-            logger.exception(f"I18N解析错误: {original}")
+            logger.exception(f"I18N parse error: {original}")
             return self.content(
                 text=original,
                 locales_dict=self.locales_dict,

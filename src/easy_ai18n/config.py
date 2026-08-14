@@ -4,13 +4,13 @@ from pathlib import Path
 
 class I18nConfig:
     func_names: list[str] = ["_"]
-    """翻译函数的名称"""
+    """Names of translation functions to recognize."""
 
     locales_dir: Path = Path(os.getcwd()) / "i18n"
-    """语言文件存放目录"""
+    """Directory for YAML translation files."""
 
     sep: str = " "
-    """默认分隔符"""
+    """Default separator between text parts."""
 
 
 ic = I18nConfig()

@@ -35,7 +35,7 @@ def test_build_rejects_await_in_f_string(tmp_path):
     )
 
     i18n = EasyAI18n(locales_dir=tmp_path / "locales")
-    with pytest.raises(UnsupportedSyntaxError, match="不支持在 f-string 中使用 await") as exc_info:
+    with pytest.raises(UnsupportedSyntaxError, match="await not allowed inside f-string") as exc_info:
         i18n.build(
             project_root=tmp_path,
             to_locales=["en"],

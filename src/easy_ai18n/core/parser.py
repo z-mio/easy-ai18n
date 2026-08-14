@@ -86,7 +86,7 @@ class UnsupportedSyntaxValidator:
 
     def _raise_unsupported(self, node: ast.AST) -> None:
         location = self._location(node)
-        message = f"构建失败: 不支持在 f-string 中使用 await{location}\n请先执行 await，再将结果传入 f-string。"
+        message = f"Build failed: await not allowed inside f-string {location}\nExecute await first, then pass the result into the f-string."
         raise UnsupportedSyntaxError(message)
 
     def _location(self, node: ast.AST) -> str:

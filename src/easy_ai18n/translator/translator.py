@@ -44,7 +44,7 @@ class GoogleTranslator(BaseItemTranslator):
                 await asyncio.sleep(1.5)
             else:
                 return str(result.text)
-        raise TranslationError(f"谷歌翻译错误: {last_exc}") from last_exc
+        raise TranslationError(f"Google Translate error: {last_exc}") from last_exc
 
 
 class BaseOpenAITranslator:
@@ -157,6 +157,6 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
                 f"Translate the text to {target_lang}:\n{text}",
             )
         except Exception as e:
-            raise TranslationError(f"OpenAI翻译错误: {e}") from e
+            raise TranslationError(f"OpenAI translation error: {e}") from e
 
         return {item.key: item.value for item in response.output}
