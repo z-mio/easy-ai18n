@@ -4,8 +4,8 @@ import yaml
 
 
 class Loader:
-    def __init__(self, locales_dir: str | Path):
-        self.locales_dir = Path(locales_dir)
+    def __init__(self, locales_dir: Path):
+        self.locales_dir = locales_dir
 
     def load_locales_file(self, locales: list[str] | None = None) -> dict[str, dict]:
         """Load YAML translation files from the locales directory.

@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Self, SupportsIndex, overload
 
 from loguru import logger
 
-from ._config import i18n_config
 from ._loader import Loader
 from ._parser import ASTParser, StringData
 from ._utils import generate_id
@@ -217,11 +216,11 @@ class PostLocaleSelector:
 class I18n:
     def __init__(
         self,
+        sep: str,
+        locales_dir: Path,
+        func_names: list[str],
         enabled_locales: list[str] | None = None,
         default_locale: str | None = None,
-        sep: str | None = None,
-        locales_dir: str | Path | None = None,
-        func_names: list[str] | None = None,
         pre_locale_selector: type[PreLocaleSelector] | None = None,
         post_locale_selector: type[PostLocaleSelector] | None = None,
     ) -> None:
@@ -244,9 +243,9 @@ class I18n:
         if self.enabled_locales and self.default_locale and self.default_locale not in self.enabled_locales:
             self.enabled_locales.append(self.default_locale)
 
-        self.sep = sep or i18n_config.sep
-        self.locales_dir = locales_dir or i18n_config.locales_dir
-        self.func_names = func_names or i18n_config.func_names
+        self.sep = sep
+        self.locales_dir = locales_dir
+        self.func_names = func_names
         self.pre_locale_selector = pre_locale_selector or PreLocaleSelector
         self.post_locale_selector = post_locale_selector or PostLocaleSelector
         self.content = LocaleContent

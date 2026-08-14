@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from loguru import logger
 
-from ._config import i18n_config
 from ._loader import Loader
 from ._parser import ASTParser, StringData
 from ._utils import generate_id, to_path
@@ -28,11 +27,11 @@ if TYPE_CHECKING:
 class Builder:
     def __init__(
         self,
+        sep: str,
+        func_names: list[str],
+        locales_dir: Path,
         to_locales: list[str] | None = None,
-        sep: str | None = None,
-        func_names: list[str] | None = None,
         project_root: str | Path | None = None,
-        locales_dir: str | Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
@@ -61,12 +60,12 @@ class Builder:
         self.include = include or []
         self.exclude = exclude or []
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
-        self.func_names = func_names or i18n_config.func_names
-        self.sep = sep or i18n_config.sep
+        self.func_names = func_names
+        self.sep = sep
         if to_locales is None:
             raise BuildError("to_locales is not configured")
         self.to_locales = to_locales
-        self.locales_dir = to_path(locales_dir) or i18n_config.locales_dir
+        self.locales_dir = locales_dir
         self.translator: BaseItemTranslator | BaseBulkTranslator = (
             translator if translator is not None else GoogleTranslator()
         )
