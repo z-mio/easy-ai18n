@@ -105,10 +105,12 @@ class Builder:
 
         for locale, string_data_list in to_be_translated.items():
             try:
-                text_id_dict = {generate_id(string_data.string): string_data for string_data in string_data_list}  # 原文id字典
+                id_to_string_data = {
+                    generate_id(string_data.string): string_data for string_data in string_data_list
+                }  # 原文id字典
                 # 变量替换
                 text_dict = {}
-                for k, string_data in text_id_dict.items():
+                for k, string_data in id_to_string_data.items():
                     if string_data.variables:
                         text = string_data.string
                         for i, var in enumerate(string_data.variables.keys()):
@@ -120,7 +122,7 @@ class Builder:
                 translated_result = await self.translate(text_dict, locale)
 
                 # 还原变量
-                for k, string_data in text_id_dict.items():
+                for k, string_data in id_to_string_data.items():
                     if string_data.variables:
                         text = translated_result[k]
                         for i, var in enumerate(string_data.variables.keys()):
@@ -153,12 +155,12 @@ class Builder:
             locales to lists of untranslated ``StringData``.
         """
         debug_log = logger.debug if verbose else lambda x: None
-        str_id_dict: dict[str, StringData] = {}
+        id_to_string_data: dict[str, StringData] = {}
         for file in self.project_files:
             for string_data in self.extract_strings(file):
                 if not string_data.string:  # 跳过空字符串 _("")
                     continue
-                str_id_dict[generate_id(string_data.string)] = string_data
+                id_to_string_data[generate_id(string_data.string)] = string_data
 
         updated_locales_dict = copy.deepcopy(self._locales_dict)
         to_be_translated: dict[str, list[StringData]] = {}
@@ -174,7 +176,7 @@ class Builder:
                 debug_log(f"Stale locale: {locale}")
         updated_locales_id_dict = self.extract_locale_ids(updated_locales_dict)
         # 添加新翻译
-        for trans_id, string_data in str_id_dict.items():
+        for trans_id, string_data in id_to_string_data.items():
             for locale in updated_locales_dict:
                 if trans_id in updated_locales_dict[locale]:
                     continue
@@ -183,11 +185,15 @@ class Builder:
                 if string_data.string not in to_be_translated[locale]:
                     to_be_translated[locale].append(string_data)
 
-                debug_log(f"New text: {locale} - {f'{string_data.string[:30]}...' if string_data.string[30:] else string_data.string}")
+                debug_log(
+                    f"New text: {locale} - {
+                        f'{string_data.string[:30]}...' if string_data.string[30:] else string_data.string
+                    }"
+                )
         # 移除过期翻译
         for locale in updated_locales_id_dict:
             for trans_id in list(updated_locales_id_dict[locale]):
-                if trans_id in str_id_dict:
+                if trans_id in id_to_string_data:
                     continue
                 if trans_id not in updated_locales_dict[locale]:
                     continue
@@ -302,11 +308,11 @@ class Builder:
             progress_bar.update()
         return all_results
 
-    async def translate(self, text_dict: dict[str, str], to_locale: str) -> dict[str, str]:
+    async def translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
         if isinstance(self.translator, BaseItemTranslator):
-            return await self.translate_items(text_dict, to_locale)
+            return await self.translate_items(text_id_dict, to_locale)
         elif isinstance(self.translator, BaseBulkTranslator):
-            return await self.translate_bulk(text_dict, to_locale)
+            return await self.translate_bulk(text_id_dict, to_locale)
         else:
             raise ValueError("Invalid translator type")
 

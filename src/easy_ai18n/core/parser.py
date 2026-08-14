@@ -86,7 +86,10 @@ class UnsupportedSyntaxValidator:
 
     def _raise_unsupported(self, node: ast.AST) -> None:
         location = self._location(node)
-        message = f"Build failed: await not allowed inside f-string {location}\nExecute await first, then pass the result into the f-string."
+        message = (
+            f"Build failed: await not allowed inside f-string {location}"
+            f"\nExecute await first, then pass the result into the f-string."
+        )
         raise UnsupportedSyntaxError(message)
 
     def _location(self, node: ast.AST) -> str:
@@ -152,7 +155,7 @@ class StringConstructor:
         node: ast.JoinedStr,
         evaluator: VariableEvaluator | None = None,
     ) -> tuple[str, dict[str, object]]:
-        """Handle an f-string AST node.
+        """Parse an f-string AST node.
 
         Args:
             node: The f-string AST node.
@@ -186,7 +189,7 @@ class StringConstructor:
 
     @staticmethod
     def _parse_conversion(conversion: int) -> str | None:
-        """Handle the conversion flag of a formatted value.
+        """Parse the conversion flag of a formatted value.
 
         Args:
             conversion: The conversion flag integer (``97`` for ``!s``,
@@ -202,7 +205,7 @@ class StringConstructor:
         format_spec: ast.expr | None,
         evaluator: VariableEvaluator | None,
     ) -> str | None:
-        """Handle the format specifier of a formatted value.
+        """Parse the format specifier of a formatted value.
 
         Args:
             format_spec: The format specifier AST node.
