@@ -2,28 +2,36 @@ import abc
 
 
 class BaseItemTranslator(abc.ABC):
-    """普通翻译器"""
+    """Translator that processes one item at a time."""
 
     @abc.abstractmethod
     async def translate(self, text: str, target_lang: str) -> str:
-        """
-        翻译
-        :param text: 要翻译的文本
-        :param target_lang: 目标语言
-        :return: 翻译结果
+        """Translate the given text to the target language.
+
+        Args:
+            text: The text to translate.
+            target_lang: The target language code.
+
+        Returns:
+            The translated text.
         """
         raise NotImplementedError()
 
 
 class BaseBulkTranslator(abc.ABC):
-    """LLM翻译器"""
+    """Translator that processes multiple items at once via LLM."""
 
     @abc.abstractmethod
     async def translate(self, text_id_dict: dict, target_lang: str) -> dict:
-        """
-        翻译
-        :param text_id_dict: 文本id字典, 格式 {"text_id": "text"}
-        :param target_lang: 目标语言
-        :return: 译文id字典, 格式 {"text_id": "text"}
+        """Translate multiple texts to the target language.
+
+        Args:
+            text_id_dict: A dictionary of text IDs to texts,
+                e.g. ``{"text_id": "text"}``.
+            target_lang: The target language code.
+
+        Returns:
+            A dictionary of translated texts keyed by ID,
+            e.g. ``{"text_id": "text"}``.
         """
         raise NotImplementedError()

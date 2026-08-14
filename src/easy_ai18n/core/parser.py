@@ -1,7 +1,10 @@
 """
-AST 解析器
-获取调用函数的代码块 -> 转为 AST 节点 -> 遍历 AST 节点 -> 提取指定函数调用的节点 -> 提取字符串和变量 -> 处理变量 -> 返回结果
-"""  # noqa: E501
+AST parser.
+
+Extracts the source code block of a translation function call,
+parses it into an AST, traverses the AST to locate the call node,
+and extracts the string and f-string variables.
+"""
 
 from __future__ import annotations
 
@@ -99,9 +102,7 @@ class UnsupportedSyntaxValidator:
 
 
 class StringConstructor:
-    """
-    根据传入的 AST 节点构造字符串，同时处理 f-string 表达式。
-    """
+    """Construct strings from AST nodes, handling f-string expressions."""
 
     def __init__(self, sep: str, func_names: list[str]):
         self.sep = sep
@@ -151,10 +152,16 @@ class StringConstructor:
         node: ast.JoinedStr,
         evaluator: VariableEvaluator | None = None,
     ) -> tuple[str, dict[str, object]]:
-        """
-        :param node:
-        :param evaluator: 为 Noe 则只提取表达式, 不求值
-        :return:
+        """Handle an f-string AST node.
+
+        Args:
+            node: The f-string AST node.
+            evaluator: The variable evaluator. If ``None``, only
+                expressions are extracted without evaluation.
+
+        Returns:
+            A tuple of the constructed string and a dictionary of
+            variable placeholders to their values.
         """
         parts: list[str] = []
         variables: dict[str, object] = {}
@@ -179,10 +186,14 @@ class StringConstructor:
 
     @staticmethod
     def _handle_conversion(conversion: int) -> str | None:
-        """
-        处理转换标志
-        :param conversion:
-        :return:
+        """Handle the conversion flag of a formatted value.
+
+        Args:
+            conversion: The conversion flag integer (``97`` for ``!s``,
+                ``114`` for ``!r``, ``115`` for ``!a``).
+
+        Returns:
+            The conversion character, or ``None`` if no conversion.
         """
         return {97: "a", 114: "r", 115: "s"}[conversion] if conversion != -1 else None
 
@@ -191,11 +202,15 @@ class StringConstructor:
         format_spec: ast.expr | None,
         evaluator: VariableEvaluator | None,
     ) -> str | None:
-        """
-        处理格式说明符
-        :param format_spec:
-        :param evaluator:
-        :return:
+        """Handle the format specifier of a formatted value.
+
+        Args:
+            format_spec: The format specifier AST node.
+            evaluator: The variable evaluator for resolving dynamic
+                format specs.
+
+        Returns:
+            The format specifier string, or ``None`` if absent.
         """
         if not format_spec:
             return None
@@ -215,16 +230,15 @@ class VariableEvaluator:
         self.locals = locals_dict
 
     def evaluate(self, expr: str, conversion: str | None = None, format_spec: str | None = None) -> object:
-        """
-        对表达式进行求值
+        """Evaluate an expression and optionally apply conversion and formatting.
 
         Args:
-            expr: 要求值的表达式
-            conversion: 转换标志 ('s', 'r', 'a')
-            format_spec: 格式说明符
+            expr: The expression to evaluate.
+            conversion: The conversion flag (``'s'``, ``'r'``, ``'a'``).
+            format_spec: The format specifier string.
 
         Returns:
-            求值结果
+            The evaluated result.
         """
         try:
             # 计算基本值
@@ -246,7 +260,7 @@ class VariableEvaluator:
             raise EvaluationError(e) from e
 
     def _evaluate_basic(self, expr: str) -> object:
-        """基础求值"""
+        """Evaluate a basic expression (variable lookup or expression)."""
         if expr.isidentifier():
             # 简单变量查找
             return self.locals.get(expr, self.globals.get(expr, None))
@@ -262,7 +276,7 @@ class VariableEvaluator:
 
     @staticmethod
     def _apply_conversion(value: object, conversion: str) -> object:
-        """应用转换标志"""
+        """Apply a conversion flag (``!s``, ``!r``, ``!a``) to a value."""
         if conversion == "s":
             return str(value)
         elif conversion == "r":
@@ -306,7 +320,7 @@ class ASTParser:
     @staticmethod
     @cache
     def _read_file_bytes(filename: str) -> list[bytes]:
-        """按行读取并缓存源文件的字节内容"""
+        """Read a source file and cache its lines as bytes."""
         with open(filename, "rb") as f:
             return f.read().splitlines(keepends=True)
 
@@ -343,8 +357,15 @@ class ASTParser:
         source_path: Path | None = None,
         source: str | None = None,
     ) -> list[StringData]:
-        """
-        仅提取解析后的字符串，默认只解析第一个匹配的调用节点。
+        """Extract all translation strings from an AST node.
+
+        Args:
+            node: The AST node to search.
+            source_path: The source file path (for error reporting).
+            source: The source code (for error reporting).
+
+        Returns:
+            A list of ``StringData`` objects for each matched call.
         """
         target_nodes = self.get_target_nodes(node)
         if not target_nodes:
@@ -365,8 +386,17 @@ class ASTParser:
         frame: FrameType | None = None,
         call_node: ast.Call | None = None,
     ) -> StringData | None:
-        """
-        解析第一个匹配的调用节点，并返回构造后的字符串及变量数据。
+        """Extract the first matching translation call from a frame.
+
+        If ``call_node`` is provided, it is used directly; otherwise
+        the source code is parsed from the given frame.
+
+        Args:
+            frame: The caller's stack frame.
+            call_node: An already-parsed call node (for cache hits).
+
+        Returns:
+            A ``StringData`` object, or ``None`` if no match is found.
         """
         # 节点解析的性能开销大, 尽量使用缓存
         if call_node is None:

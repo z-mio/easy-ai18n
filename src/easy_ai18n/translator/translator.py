@@ -1,5 +1,5 @@
 """
-翻译器
+Translator implementations for Google Translate and OpenAI.
 """
 
 import asyncio
@@ -32,7 +32,7 @@ Don't add anything extra, and don't modify python variables inside the text
 
 
 class GoogleTranslator(BaseItemTranslator):
-    """谷歌翻译"""
+    """Google Translate translator."""
 
     async def translate(self, text: str, target_lang: str) -> str:
         last_exc: Exception | None = None
@@ -48,7 +48,7 @@ class GoogleTranslator(BaseItemTranslator):
 
 
 class BaseOpenAITranslator:
-    """OpenAI 翻译器基础配置"""
+    """Base configuration for OpenAI translators."""
 
     def __init__(
         self,
@@ -63,7 +63,7 @@ class BaseOpenAITranslator:
         self.prompt = prompt
 
     def _create_model(self) -> OpenAIChatModel:
-        """创建 OpenAI Chat Model。"""
+        """Create an OpenAI Chat Model instance."""
         return OpenAIChatModel(
             self.model,
             provider=OpenAIProvider(
@@ -74,7 +74,7 @@ class BaseOpenAITranslator:
 
 
 class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
-    """OpenAI翻译器 | 逐条翻译"""
+    """OpenAI translator — translates items one by one."""
 
     def __init__(
         self,
@@ -83,11 +83,13 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
         model: str | None = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
-        """
-        :param api_key: OpenAI API Key
-        :param base_url: OpenAI API URL
-        :param model: 模型
-        :param prompt: 提示词
+        """Initialize OpenAIItemTranslator.
+
+        Args:
+            api_key: OpenAI API key.
+            base_url: OpenAI API base URL.
+            model: The model name to use.
+            prompt: The system prompt for translation.
         """
         BaseOpenAITranslator.__init__(self, api_key, base_url, model, prompt)
         self._agent = Agent[object, str](
@@ -98,7 +100,7 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
         )
 
     async def translate(self, text: str, target_lang: str) -> str:
-        """GPT 逐条翻译。"""
+        """Translate a single text item using GPT."""
 
         result = await self._agent.run(
             f"Translate the text to {target_lang}:\n{text}",
@@ -112,7 +114,7 @@ class TranslatorResult(BaseModel):
 
 
 class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
-    """OpenAI翻译器 | 整体翻译"""
+    """OpenAI translator — translates multiple items in bulk."""
 
     def __init__(
         self,
@@ -121,11 +123,13 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         model: str | None = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
-        """
-        :param api_key: OpenAI API Key
-        :param base_url: OpenAI API URL
-        :param model: 模型
-        :param prompt: 提示词
+        """Initialize OpenAIBulkTranslator.
+
+        Args:
+            api_key: OpenAI API key.
+            base_url: OpenAI API base URL.
+            model: The model name to use.
+            prompt: The system prompt for translation.
         """
         BaseOpenAITranslator.__init__(self, api_key, base_url, model, prompt)
         self._agent = Agent[object, list[TranslatorResult]](
@@ -137,10 +141,15 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         )
 
     async def translate(self, text_id_dict: dict, target_lang: str) -> dict:
-        """
-        :param text_id_dict: 文本id字典，格式 {"text_id": "text"}
-        :param target_lang: 目标语言
-        :return: 合并后的翻译结果字典
+        """Translate a batch of texts using GPT.
+
+        Args:
+            text_id_dict: A dictionary of text IDs to texts,
+                e.g. ``{"text_id": "text"}``.
+            target_lang: The target language code.
+
+        Returns:
+            A merged dictionary of translated texts keyed by ID.
         """
         try:
             text = PrettyPrinter().pformat(text_id_dict)

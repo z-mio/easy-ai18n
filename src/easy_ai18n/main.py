@@ -16,11 +16,15 @@ class EasyAI18n:
         sep: str | None = None,
         locales_dir: str | Path | None = None,
     ):
-        """
-        初始化 EasyAI18n 实例。
-        :param func_names: 翻译函数的名称
-        :param sep: 分隔符, 默认为空格
-        :param locales_dir: 语言文件存放目录
+        """Initialize EasyAI18n.
+
+        Args:
+            func_names: The names of translation functions to
+                recognize (defaults to ``["_"]``).
+            sep: The separator between text parts (defaults to
+                a space).
+            locales_dir: The directory for YAML translation files
+                (defaults to ``./i18n``).
         """
         self.func_names = to_list(func_names) or ic.func_names
         self.sep = sep or ic.sep
@@ -37,16 +41,19 @@ class EasyAI18n:
         max_concurrency: int | None = None,
         show_progress: bool = True,
     ) -> None:
-        """
-        构建翻译文件
-        :param to_locales: 要翻译到的目标语言
-        :param project_root: 项目根目录
-        :param include: 包含的文件或目录
-        :param exclude: 排除的文件或目录
-        :param translator: 翻译器, 默认为 GoogleTranslator
-        :param max_concurrency: 翻译时的最大并发数
-        :param show_progress: 是否显示翻译进度条
-        :return:
+        """Build translation files (synchronous wrapper).
+
+        Args:
+            to_locales: The target language codes to translate to.
+            project_root: The project root directory.
+            include: File or directory patterns to include.
+            exclude: File or directory patterns to exclude.
+            translator: The translator instance. Defaults to
+                ``GoogleTranslator``.
+            max_concurrency: The maximum number of concurrent
+                translation tasks.
+            show_progress: Whether to show the translation progress
+                bar.
         """
         return asyncio.run(
             self.build_async(
@@ -70,16 +77,19 @@ class EasyAI18n:
         max_concurrency: int | None = None,
         show_progress: bool = True,
     ) -> None:
-        """
-        异步构建翻译文件
-        :param to_locales: 要翻译到的目标语言
-        :param project_root: 项目根目录
-        :param include: 包含的文件或目录
-        :param exclude: 排除的文件或目录
-        :param translator: 翻译器, 默认为 GoogleTranslator
-        :param max_concurrency: 翻译时的最大并发数
-        :param show_progress: 是否显示翻译进度条
-        :return:
+        """Build translation files asynchronously.
+
+        Args:
+            to_locales: The target language codes to translate to.
+            project_root: The project root directory.
+            include: File or directory patterns to include.
+            exclude: File or directory patterns to exclude.
+            translator: The translator instance. Defaults to
+                ``GoogleTranslator``.
+            max_concurrency: The maximum number of concurrent
+                translation tasks.
+            show_progress: Whether to show the translation progress
+                bar.
         """
         from .core.builder import Builder
 
@@ -104,13 +114,17 @@ class EasyAI18n:
         pre_locale_selector: type[PreLocaleSelector] | None = None,
         post_locale_selector: type[PostLocaleSelector] | None = None,
     ) -> I18n:
-        """
-        翻译函数入口
-        :param default_locale: 默认使用的语言
-        :param enabled_locales: 要启用的语言, 默认启用全部语言
-        :param pre_locale_selector: 前置语言选择器
-        :param post_locale_selector: 后置语言选择器
-        :return:
+        """Create an ``I18n`` instance for translation.
+
+        Args:
+            default_locale: The default locale code.
+            enabled_locales: The list of enabled language codes.
+                Defaults to all available locales.
+            pre_locale_selector: The pre-call locale selector class.
+            post_locale_selector: The post-call locale selector class.
+
+        Returns:
+            An ``I18n`` instance.
         """
         return I18n(
             default_locale=default_locale,

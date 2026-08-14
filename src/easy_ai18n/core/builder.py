@@ -1,5 +1,5 @@
 """
-翻译字典构建器
+Translation dictionary builder.
 """
 
 from __future__ import annotations
@@ -40,18 +40,23 @@ class Builder:
         show_progress: bool = True,
         max_concurrency: int | None = None,
     ):
-        """
-        初始化Builder
-        :param to_locales: 要翻译到的目标语言
-        :param sep: 分隔符
-        :param func_names: 翻译函数名
-        :param project_root: 项目根目录
-        :param locales_dir: 语言文件目录
-        :param include: 包含的文件或目录
-        :param exclude: 排除的文件或目录
-        :param translator: 翻译器, 默认为 GoogleTranslator
-        :param show_progress: 是否显示翻译进度条
-        :param max_concurrency: 翻译时的最大并发数
+        """Initialize Builder.
+
+        Args:
+            to_locales: The target language codes to translate to.
+            sep: The separator between text parts.
+            func_names: The names of translation functions to
+                recognize during AST parsing.
+            project_root: The project root directory.
+            locales_dir: The directory for YAML translation files.
+            include: File or directory patterns to include.
+            exclude: File or directory patterns to exclude.
+            translator: The translator instance. Defaults to
+                ``GoogleTranslator``.
+            show_progress: Whether to show the translation progress
+                bar.
+            max_concurrency: The maximum number of concurrent
+                translation tasks.
         """
         self.project_root = to_path(project_root) or Path(os.getcwd())
         self.include = include or []
@@ -84,10 +89,17 @@ class Builder:
             return
 
     async def build(self, save_to_file: bool = True) -> bool:
-        """
-        构建翻译字典
-        :param save_to_file: 是否保存到文件
-        :return:
+        """Build the translation dictionary.
+
+        Compares the current source strings with the existing
+        translation files, translates new content, and optionally
+        persists the results.
+
+        Args:
+            save_to_file: Whether to save the results to YAML files.
+
+        Returns:
+            ``True`` if the build completed successfully.
         """
         updated_locales_dict, to_be_translated = self.check_changes()
 
@@ -126,9 +138,19 @@ class Builder:
         return True
 
     def check_changes(self, log: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
-        """
-        检查差异
-        :return: 移除过期翻译后的字典, 新增内容字典
+        """Check for changes between source strings and existing translations.
+
+        Identifies new strings that need translation and removes
+        translations for strings that no longer exist in the source.
+
+        Args:
+            log: Whether to log change details at debug level.
+
+        Returns:
+            A tuple of ``(updated_locales_dict, to_be_translated)``,
+            where ``updated_locales_dict`` is the cleaned-up
+            translation dictionary and ``to_be_translated`` maps
+            locales to lists of untranslated ``StringData``.
         """
         lg = logger.debug if log else lambda x: None
         str_id_dict: dict[str, StringData] = {}
@@ -206,20 +228,25 @@ class Builder:
         return project_files
 
     def is_changed(self) -> bool:
-        """
-        判断 locales 字典是否有更新
-        :return:
+        """Check whether the translation data has changed.
+
+        Returns:
+            ``True`` if there are new or removed strings compared to
+            the existing translation files.
         """
 
         updated_locale_dict, to_be_translated = self.check_changes(log=False)
         return bool(updated_locale_dict != self._locales_dict or to_be_translated)
 
     async def item_translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
-        """
-        逐条翻译
-        :param text_id_dict: 待翻译的字符串字典 {id: text}
-        :param to_locale: 目标语言
-        :return: 翻译后的字典 {id: translated_text}
+        """Translate texts one by one.
+
+        Args:
+            text_id_dict: A dictionary of text IDs to texts.
+            to_locale: The target language code.
+
+        Returns:
+            A dictionary of translated texts keyed by ID.
         """
         result: dict[str, str] = {}
         pbar = self.pbar(to_locale, len(text_id_dict))
@@ -253,11 +280,14 @@ class Builder:
         return result
 
     async def bulk_translation(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
-        """
-        整体翻译
-        :param text_id_dict:
-        :param to_locale:
-        :return:
+        """Translate texts in bulk.
+
+        Args:
+            text_id_dict: A dictionary of text IDs to texts.
+            to_locale: The target language code.
+
+        Returns:
+            A dictionary of translated texts keyed by ID.
         """
         translator = self.translator
         if not isinstance(translator, BaseBulkTranslator):
@@ -281,10 +311,14 @@ class Builder:
             raise ValueError("错误的翻译器类型")
 
     def extract_strings(self, file: Path) -> list[StringData]:
-        """
-        从文件中提取出所有需要翻译的字符串
-        :param file: 文件路径
-        :return:
+        """Extract all translatable strings from a Python file.
+
+        Args:
+            file: The path to the Python file.
+
+        Returns:
+            A list of ``StringData`` objects for each translation
+            call found in the file.
         """
         source = file.read_text(encoding="utf-8")
         module = ast.parse(source)
@@ -295,20 +329,25 @@ class Builder:
         )
 
     def save_to_yaml(self, locale_dict: dict[str, str], locale: str) -> None:
-        """
-        将翻译结果输出到文件
-        :param locale_dict: 翻译结果字典
-        :param locale: 目标语言
-        :return:
+        """Save a translation dictionary to a YAML file.
+
+        Args:
+            locale_dict: The translation dictionary to save.
+            locale: The locale code, used as the filename.
         """
         with open(self.locales_dir / f"{locale}.yaml", "w", encoding="utf-8") as f:
             yaml.dump(locale_dict, f, allow_unicode=True)
 
     @staticmethod
     def locales_dict_to_id_dict(locales_dict: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
-        """
-        获取 locales 字典中的所有id
-        :return:
+        """Extract all translation IDs from a locales dictionary.
+
+        Args:
+            locales_dict: The locales dictionary.
+
+        Returns:
+            A dictionary mapping locale codes to lists of translation
+            IDs.
         """
 
         if not locales_dict:

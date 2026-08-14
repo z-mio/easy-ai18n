@@ -3,10 +3,13 @@ from pathlib import Path
 
 
 def gen_id(text: object) -> str:
-    """
-    生成唯一ID
-    :param text: 输入字符串
-    :return: 12位的十六进制字符串
+    """Generate a unique 12-character hex ID from the given text.
+
+    Args:
+        text: The input string to hash.
+
+    Returns:
+        A 12-character hexadecimal string.
     """
     text = str(text).encode("utf-8")
     return hashlib.md5(text).hexdigest()[:12]

@@ -1,5 +1,5 @@
 """
-翻译函数, 语言选择器
+Translation function and language selector.
 """
 
 import inspect
@@ -20,7 +20,10 @@ if TYPE_CHECKING:
 
 
 class PreLocaleSelector:
-    """前置语言选择器"""
+    """Pre-call language selector.
+
+    Used via ``_[locale]("text")`` syntax.
+    """
 
     def __init__(self, *, i18n: "I18n", sep: str, locale: str | None = None):
         self.i18n = i18n
@@ -34,12 +37,17 @@ class PreLocaleSelector:
         return ""
 
     def __call__(self, *args: object, sep: str | None = None) -> str:
-        """
-        调用后置语言选择器
-        _[前置语言选择器]('内容')
-        :param args: 要翻译的文本
-        :param sep: 分隔符
-        :return:
+        """Translate text with the pre-selected locale.
+
+        Called via ``_[locale]("text")``.
+
+        Args:
+            args: The text parts to translate.
+            sep: The separator between text parts. Defaults to the
+                configured separator.
+
+        Returns:
+            The translated string.
         """
         current_frame = inspect.currentframe()
         frame = current_frame.f_back if current_frame else None
@@ -47,7 +55,11 @@ class PreLocaleSelector:
 
 
 class LocaleContent(str):
-    """内容"""
+    """Translated content with multi-locale access.
+
+    Behaves like a string in the default locale and supports locale
+    selection via ``content["locale"]`` or ``content(locale)``.
+    """
 
     def __new__(
         cls,
@@ -88,13 +100,27 @@ class LocaleContent(str):
     def __getitem__(self, locale: str | None) -> str: ...
 
     def __getitem__(self, locale: SupportsIndex | slice | str | None) -> str:
-        """_('内容')[后置语言选择器]"""
+        """Select a locale via ``_[locale]`` syntax.
+
+        Args:
+            locale: The locale code to retrieve.
+
+        Returns:
+            The translated string for the given locale.
+        """
         if isinstance(locale, (SupportsIndex, slice)):
             return super().__getitem__(locale)
         return self.__call__(locale)
 
     def __call__(self, locale: str | None) -> str:
-        """_('内容')(后置语言选择器)"""
+        """Select a locale via ``_(locale)`` syntax.
+
+        Args:
+            locale: The locale code to retrieve.
+
+        Returns:
+            The translated string for the given locale.
+        """
         return str(
             self._post_locale_selector(
                 text=self._text,
@@ -109,7 +135,10 @@ class LocaleContent(str):
 
 
 class PostLocaleSelector:
-    """后置语言选择器"""
+    """Post-call language selector.
+
+    Used via ``_("text")[locale]`` or ``_("text")(locale)`` syntax.
+    """
 
     def __init__(
         self,
@@ -119,10 +148,14 @@ class PostLocaleSelector:
         variables: dict[str, object] | None = None,
         locale: str | None = None,
     ):
-        """
-        语言选择器，用于选择翻译后的语言
-        :param text: 要翻译的文本
-        :param variables: 变量字典，用于替换f-string中的变量
+        """Initialize PostLocaleSelector.
+
+        Args:
+            text: The text to translate.
+            locales_dict: The translation data for all locales.
+            variables: A dictionary of f-string variable placeholders
+                and their values.
+            locale: The default locale code.
         """
         self.text = text
         self.locales_dict = locales_dict
@@ -136,11 +169,27 @@ class PostLocaleSelector:
         return self.__getitem__(self.locale)
 
     def __getitem__(self, locale: str | None) -> str:
-        """_('内容')[后置语言选择器]"""
+        """Select a locale via ``[locale]`` syntax.
+
+        Args:
+            locale: The locale code to retrieve.
+
+        Returns:
+            The translated string.
+        """
         return self.format(locale)
 
     def format(self, locale: str | None = None) -> str:
-        """格式化字符串并应用翻译"""
+        """Format the string and apply translation.
+
+        Args:
+            locale: The locale code to translate to. If ``None``,
+                the original text is returned with variables
+                substituted.
+
+        Returns:
+            The formatted and translated string.
+        """
         if not locale:
             return self._format(self.text)
         translated = self.get_by_text(self.text, locale)
@@ -168,14 +217,16 @@ class I18n:
         pre_locale_selector: type[PreLocaleSelector] | None = None,
         post_locale_selector: type[PostLocaleSelector] | None = None,
     ) -> None:
-        """
-        初始化I18n
-        :param enabled_locales: 要启用的语言
-        :param default_locale: 默认使用的语言
-        :param sep: 字符串分隔符
-        :param func_names: 翻译函数名
-        :param pre_locale_selector: 前置语言选择器类
-        :param post_locale_selector: 后置语言选择器类
+        """Initialize I18n.
+
+        Args:
+            enabled_locales: The list of enabled language codes.
+            default_locale: The default locale code.
+            sep: The separator between text parts.
+            func_names: The names of translation functions to
+                recognize during AST parsing.
+            pre_locale_selector: The pre-call locale selector class.
+            post_locale_selector: The post-call locale selector class.
         """
         self._cache: dict[str, ast.Call] = {}
         self._parse_failures: set[str] = set()
@@ -194,15 +245,21 @@ class I18n:
         self.locales_dict = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
 
     def t(self, *args: object, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent:
-        """
-        入口函数
+        """Translate text by parsing the caller's AST node.
+
+        This is the core translation entry point. It extracts the
+        source code at the call site, parses the AST, and resolves
+        f-string variables at runtime.
 
         Args:
-            sep: 字符串分隔符，默认为空格
-            frame: 调用者的栈帧，默认使用当前栈帧
+            args: The text parts to join and translate.
+            sep: The separator between text parts. Defaults to the
+                configured separator.
+            frame: The caller's stack frame. If ``None``, the current
+                frame is used.
 
         Returns:
-            PostLanguageSelector 对象
+            A ``LocaleContent`` object that supports locale selection.
         """
         sep = sep or self.sep
         original = sep.join([str(item) for item in args])
@@ -247,7 +304,21 @@ class I18n:
             del f
 
     def _handle_cache(self, original: str, cache_key: str, result: StringData | None) -> LocaleContent:
-        """处理缓存并返回结果"""
+        """Handle the cache entry and return the result.
+
+        If parsing succeeded, the AST node is cached; otherwise the
+        failure is recorded so the original text is returned on
+        subsequent calls.
+
+        Args:
+            original: The original joined text.
+            cache_key: The cache key derived from the caller's frame
+                position.
+            result: The parsed result, or ``None`` if parsing failed.
+
+        Returns:
+            A ``LocaleContent`` object for the translated text.
+        """
         if not result:
             self._parse_failures.add(cache_key)
             logger.exception(f"I18N解析错误: {original}")
@@ -267,16 +338,33 @@ class I18n:
         )
 
     def clear_cache(self) -> None:
-        """清除解析缓存"""
+        """Clear the AST parse cache and failure record."""
         self._cache.clear()
         self._parse_failures.clear()
 
     def __getitem__(self, locale: str) -> PreLocaleSelector:
-        """调用前置语言选择器"""
+        """Select a locale via ``I18n[locale]`` syntax.
+
+        Args:
+            locale: The locale code to select.
+
+        Returns:
+            A ``PreLocaleSelector`` that translates all subsequent
+            calls to the given locale.
+        """
         return self.pre_locale_selector(i18n=self, locale=locale, sep=self.sep)
 
     def __call__(self, *args: object, sep: str | None = None) -> LocaleContent:
-        """调用入口函数"""
+        """Translate text by calling ``I18n(...)``.
+
+        Args:
+            args: The text parts to translate.
+            sep: The separator between text parts. Defaults to the
+                configured separator.
+
+        Returns:
+            A ``LocaleContent`` object that supports locale selection.
+        """
         current_frame = inspect.currentframe()
         frame = current_frame.f_back if current_frame else None
         return self.t(*args, sep=sep or self.sep, frame=frame)

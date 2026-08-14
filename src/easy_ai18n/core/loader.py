@@ -8,9 +8,15 @@ class Loader:
         self.locales_dir = Path(locales_dir)
 
     def load_locales_file(self, locales: list[str] | None = None) -> dict[str, dict]:
-        """
-        加载 locales 目录下的 yaml 文件
-        :return: locales 字典
+        """Load YAML translation files from the locales directory.
+
+        Args:
+            locales: An optional list of language codes to load.
+                If ``None``, all YAML files are loaded.
+
+        Returns:
+            A dictionary mapping locale codes to their translation
+            dictionaries.
         """
         locales_dict: dict[str, dict] = {}
         yaml_files = list(self.locales_dir.glob("**/*.yaml"))
