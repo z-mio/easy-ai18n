@@ -258,9 +258,9 @@ class VariableEvaluator:
                 format_spec = self._eval_format_spec(format_spec)
                 return format(value, format_spec)
             except Exception as e:
-                raise FormatError(e) from e
+                raise FormatError(str(e)) from e
         except Exception as e:
-            raise EvaluationError(e) from e
+            raise EvaluationError(str(e)) from e
 
     def _evaluate_basic(self, expr: str) -> object:
         """Evaluate a basic expression (variable lookup or expression)."""

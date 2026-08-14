@@ -23,5 +23,6 @@ class UnsupportedSyntaxError(EasyAI18nError):
 
 
 class BuildDependencyError(EasyAI18nError):
-    def __init__(self) -> None:
-        super().__init__("Missing dependencies. Install with: pip install easy_ai18n[build]")
+    def __init__(self, message: str | None = None) -> None:
+        msg = message or "Missing dependencies. Install with: pip install easy_ai18n[build]"
+        super().__init__(msg)

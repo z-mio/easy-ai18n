@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Self, SupportsIndex, overload
 from loguru import logger
 
 from ..config import i18n_config
+from ..errors import EvaluationError, FormatError, UnsupportedSyntaxError
 from ..utils import generate_id
 from .loader import Loader
 from .parser import ASTParser, StringData
@@ -292,8 +293,16 @@ class I18n:
         try:
             result = ASTParser(sep=sep, func_names=self.func_names).extract(frame=f, call_node=call_node)
             return self._handle_cache(original, cache_key, result)
-        except Exception:
+        except (FormatError, EvaluationError, UnsupportedSyntaxError):
             logger.exception("I18N parse error")
+            self._parse_failures.add(cache_key)
+            return self.content(
+                text=original,
+                locales_dict=self.locales_dict,
+                post_locale_selector=self.post_locale_selector,
+            )
+        except Exception:
+            logger.exception("Unexpected I18N error")
             self._parse_failures.add(cache_key)
             return self.content(
                 text=original,

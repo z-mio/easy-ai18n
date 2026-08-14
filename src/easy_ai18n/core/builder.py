@@ -15,7 +15,7 @@ import yaml
 from loguru import logger
 
 from ..config import i18n_config
-from ..errors import BuildDependencyError
+from ..errors import BuildDependencyError, BuildError, TranslationError
 from ..translator import GoogleTranslator
 from ..translator.base import BaseBulkTranslator, BaseItemTranslator
 from ..utils import generate_id, to_path
@@ -65,7 +65,7 @@ class Builder:
         self.func_names = func_names or i18n_config.func_names
         self.sep = sep or i18n_config.sep
         if to_locales is None:
-            raise ValueError("Build failed: to_locales is not configured")
+            raise BuildError("to_locales is not configured")
         self.to_locales = to_locales
         self.locales_dir = to_path(locales_dir) or i18n_config.locales_dir
         self.translator: BaseItemTranslator | BaseBulkTranslator = translator or GoogleTranslator()
@@ -128,8 +128,10 @@ class Builder:
                         for i, var in enumerate(string_data.variables.keys()):
                             text = text.replace(f"{{{{{i}}}}}", var)
                         translated_result[k] = text
+            except TranslationError:
+                logger.error(f"Translation to {locale} failed")
             except Exception:
-                logger.exception(f"Translation to {locale} failed:")
+                logger.exception(f"Unexpected error translating to {locale}:")
             else:
                 updated_locales_dict.setdefault(locale, {})
                 updated_locales_dict[locale] |= translated_result
@@ -260,7 +262,7 @@ class Builder:
         semaphore = asyncio.Semaphore(self.max_concurrency)
         translator = self.translator
         if not isinstance(translator, BaseItemTranslator):
-            raise ValueError("Invalid translator type")
+            raise BuildError("translate_items requires a BaseItemTranslator")
 
         async def _translate_one(text: str, locale: str, sem: asyncio.Semaphore) -> str:
             async with sem:
@@ -278,8 +280,10 @@ class Builder:
         for key, task in tasks.items():
             try:
                 translated_text = task.result()
+            except TranslationError:
+                logger.error(f"→ [{to_locale}] Translation failed (id={key}, text={text_id_dict[key]})")
             except Exception:
-                logger.exception(f"→ [{to_locale}] Translation failed (id={key}, text={text_id_dict[key]}):")
+                logger.exception(f"→ [{to_locale}] Unexpected error (id={key}):")
             else:
                 result[key] = translated_text
 
@@ -297,7 +301,7 @@ class Builder:
         """
         translator = self.translator
         if not isinstance(translator, BaseBulkTranslator):
-            raise ValueError("Invalid translator type")
+            raise BuildError("translate_bulk requires a BaseBulkTranslator")
         with self.progress_bar(to_locale, 1) as progress_bar:
             all_results: dict[str, str] = {}
             items = list(text_id_dict.items())
@@ -314,7 +318,7 @@ class Builder:
         elif isinstance(self.translator, BaseBulkTranslator):
             return await self.translate_bulk(text_id_dict, to_locale)
         else:
-            raise ValueError("Invalid translator type")
+            raise BuildError(f"Unsupported translator type: {type(self.translator).__name__}")
 
     def extract_strings(self, file: Path) -> list[StringData]:
         """Extract all translatable strings from a Python file.
