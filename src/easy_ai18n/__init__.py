@@ -4,7 +4,6 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ._utils import to_list
 from .i18n import I18n, LocaleContent, PostLocaleSelector, PreLocaleSelector
 
 if TYPE_CHECKING:
@@ -36,7 +35,7 @@ class EasyAI18n:
             locales_dir: The directory for YAML translation files
                 (defaults to ``./i18n``).
         """
-        self.func_names = to_list(func_names) or ["_"]
+        self.func_names = func_names if isinstance(func_names, list) else [func_names] if func_names else ["_"]
         self.sep = sep or " "
         self.locales_dir = Path(locales_dir) if locales_dir else Path.cwd() / "i18n"
         self.locales_dir.mkdir(parents=True, exist_ok=True)
@@ -104,10 +103,10 @@ class EasyAI18n:
         from ._builder import Builder
 
         builder = Builder(
-            to_locales=to_list(to_locales),
+            to_locales=[to_locales] if isinstance(to_locales, str) else to_locales,
             sep=self.sep,
             func_names=self.func_names,
-            project_root=project_root,
+            project_root=Path(project_root) if project_root else None,
             locales_dir=self.locales_dir,
             include=include,
             exclude=exclude,
@@ -138,7 +137,7 @@ class EasyAI18n:
         """
         return I18n(
             default_locale=default_locale,
-            enabled_locales=to_list(enabled_locales),
+            enabled_locales=[enabled_locales] if isinstance(enabled_locales, str) else enabled_locales,
             sep=self.sep,
             locales_dir=self.locales_dir,
             func_names=self.func_names,

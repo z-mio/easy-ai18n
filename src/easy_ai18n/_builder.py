@@ -16,7 +16,7 @@ from loguru import logger
 
 from ._loader import Loader
 from ._parser import ASTParser, StringData
-from ._utils import generate_id, to_path
+from ._utils import generate_id
 from .errors import BuildDependencyError, BuildError, TranslationError
 from .translators import BaseBulkTranslator, BaseItemTranslator, GoogleTranslator
 
@@ -31,7 +31,7 @@ class Builder:
         func_names: list[str],
         locales_dir: Path,
         to_locales: list[str] | None = None,
-        project_root: str | Path | None = None,
+        project_root: Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
@@ -56,7 +56,7 @@ class Builder:
             max_concurrency: The maximum number of concurrent
                 translation tasks.
         """
-        self.project_root = to_path(project_root) or Path(os.getcwd())
+        self.project_root = project_root or Path(os.getcwd())
         self.include = include or []
         self.exclude = exclude or []
         self.default_exclude = [".venv", "venv", ".git", ".idea"]

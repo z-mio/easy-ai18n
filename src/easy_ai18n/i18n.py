@@ -283,7 +283,7 @@ class I18n:
             f.f_code.co_name,
             f.f_code.co_filename,
         )
-        cache_key = generate_id(positions)
+        cache_key = generate_id(str(positions))
 
         # 解析错误的内容直接返回原文
         if cache_key in self._parse_failures:
