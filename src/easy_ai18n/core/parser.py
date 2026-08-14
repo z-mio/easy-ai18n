@@ -128,7 +128,7 @@ class StringConstructor:
                 raw_parts.append(str(arg.value))
             else:
                 if isinstance(arg, ast.JoinedStr):
-                    part, found = self._handle_f_string(arg, evaluator)
+                    part, found = self._parse_f_string(arg, evaluator)
                 else:
                     # 将其他表达式包装为 f-string
                     expr_src = ast.unparse(arg)
@@ -139,7 +139,7 @@ class StringConstructor:
                     wrapper_arg = wrapper_expr.value.args[0]
                     if not isinstance(wrapper_arg, ast.JoinedStr):
                         continue
-                    part, found = self._handle_f_string(wrapper_arg, evaluator)
+                    part, found = self._parse_f_string(wrapper_arg, evaluator)
 
                 raw_parts.append(part)
                 variables.update(found)
@@ -147,7 +147,7 @@ class StringConstructor:
             return r, variables
         return "", {}
 
-    def _handle_f_string(
+    def _parse_f_string(
         self,
         node: ast.JoinedStr,
         evaluator: VariableEvaluator | None = None,
@@ -171,9 +171,9 @@ class StringConstructor:
             elif isinstance(value, ast.FormattedValue):
                 expr = ast.unparse(value.value)
                 # 获取转换标志
-                conversion = self._handle_conversion(value.conversion)
+                conversion = self._parse_conversion(value.conversion)
                 # 获取格式说明符
-                format_spec = self._handle_format_spec(value.format_spec, evaluator)
+                format_spec = self._parse_format_spec(value.format_spec, evaluator)
                 # 构建格式化表达式
                 expr_ = (
                     f"{{{expr}{('!' + conversion) if conversion else ''}{(':' + format_spec) if format_spec else ''}}}"
@@ -185,7 +185,7 @@ class StringConstructor:
         return "".join(parts), variables
 
     @staticmethod
-    def _handle_conversion(conversion: int) -> str | None:
+    def _parse_conversion(conversion: int) -> str | None:
         """Handle the conversion flag of a formatted value.
 
         Args:
@@ -197,7 +197,7 @@ class StringConstructor:
         """
         return {97: "a", 114: "r", 115: "s"}[conversion] if conversion != -1 else None
 
-    def _handle_format_spec(
+    def _parse_format_spec(
         self,
         format_spec: ast.expr | None,
         evaluator: VariableEvaluator | None,
@@ -216,7 +216,7 @@ class StringConstructor:
             return None
 
         if isinstance(format_spec, ast.JoinedStr):
-            spec_str, _ = self._handle_f_string(format_spec, evaluator)
+            spec_str, _ = self._parse_f_string(format_spec, evaluator)
             return spec_str
         elif isinstance(format_spec, ast.Constant):
             return str(format_spec.value)

@@ -11,7 +11,7 @@ from ..errors import BuildDependencyError, TranslationError
 from .base import BaseBulkTranslator, BaseItemTranslator
 
 try:
-    from googletrans import Translator as Gt
+    from googletrans import Translator as GoogleTranslatorLib
     from pydantic_ai import Agent
     from pydantic_ai.models.openai import OpenAIChatModel
     from pydantic_ai.providers.openai import OpenAIProvider
@@ -38,7 +38,7 @@ class GoogleTranslator(BaseItemTranslator):
         last_exc: Exception | None = None
         for _ in range(3):
             try:
-                result = await Gt().translate(text, dest=target_lang)
+                result = await GoogleTranslatorLib().translate(text, dest=target_lang)
             except Exception as e:
                 last_exc = e
                 await asyncio.sleep(1.5)

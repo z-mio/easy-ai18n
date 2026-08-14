@@ -14,11 +14,11 @@ from typing import TYPE_CHECKING, Any
 import yaml
 from loguru import logger
 
-from ..config import ic
+from ..config import i18n_config
 from ..errors import BuildDependencyError
 from ..translator import GoogleTranslator
 from ..translator.base import BaseBulkTranslator, BaseItemTranslator
-from ..utils import gen_id, to_path
+from ..utils import generate_id, to_path
 from .loader import Loader
 from .parser import ASTParser, StringData
 
@@ -62,12 +62,12 @@ class Builder:
         self.include = include or []
         self.exclude = exclude or []
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
-        self.func_names = func_names or ic.func_names
-        self.sep = sep or ic.sep
+        self.func_names = func_names or i18n_config.func_names
+        self.sep = sep or i18n_config.sep
         if to_locales is None:
             raise ValueError("Build failed: to_locales is not configured")
         self.to_locales = to_locales
-        self.locales_dir = to_path(locales_dir) or ic.locales_dir
+        self.locales_dir = to_path(locales_dir) or i18n_config.locales_dir
         self.translator: BaseItemTranslator | BaseBulkTranslator = translator or GoogleTranslator()
 
         self.project_files = self.load_file()
@@ -101,50 +101,50 @@ class Builder:
         Returns:
             ``True`` if the build completed successfully.
         """
-        updated_locales_dict, to_be_translated = self.check_changes()
+        updated_locales_dict, to_be_translated = self.compute_changes()
 
-        for locale, sd_list in to_be_translated.items():
+        for locale, string_data_list in to_be_translated.items():
             try:
-                text_id_dict = {gen_id(sd.string): sd for sd in sd_list}  # 原文id字典
+                text_id_dict = {generate_id(string_data.string): string_data for string_data in string_data_list}  # 原文id字典
                 # 变量替换
-                str_list = {}
-                for k, sd in text_id_dict.items():
-                    if sd.variables:
-                        text = sd.string
-                        for i, var in enumerate(sd.variables.keys()):
+                text_dict = {}
+                for k, string_data in text_id_dict.items():
+                    if string_data.variables:
+                        text = string_data.string
+                        for i, var in enumerate(string_data.variables.keys()):
                             text = text.replace(var, f"{{{{{i}}}}}")
-                        str_list[k] = text
+                        text_dict[k] = text
                     else:
-                        str_list[k] = sd.string
+                        text_dict[k] = string_data.string
                 # 翻译
-                trans_result = await self.translate(str_list, locale)
+                translated_result = await self.translate(text_dict, locale)
 
                 # 还原变量
-                for k, sd in text_id_dict.items():
-                    if sd.variables:
-                        text = trans_result[k]
-                        for i, var in enumerate(sd.variables.keys()):
+                for k, string_data in text_id_dict.items():
+                    if string_data.variables:
+                        text = translated_result[k]
+                        for i, var in enumerate(string_data.variables.keys()):
                             text = text.replace(f"{{{{{i}}}}}", var)
-                        trans_result[k] = text
+                        translated_result[k] = text
             except Exception:
                 logger.exception(f"Translation to {locale} failed:")
             else:
                 updated_locales_dict.setdefault(locale, {})
-                updated_locales_dict[locale] |= trans_result
+                updated_locales_dict[locale] |= translated_result
 
         if save_to_file:
             for locale in updated_locales_dict:
                 self.save_to_yaml(updated_locales_dict[locale], locale)
         return True
 
-    def check_changes(self, log: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
-        """Check for changes between source strings and existing translations.
+    def compute_changes(self, verbose: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
+        """Compute changes between source strings and existing translations.
 
         Identifies new strings that need translation and removes
         translations for strings that no longer exist in the source.
 
         Args:
-            log: Whether to log change details at debug level.
+            verbose: Whether to log change details at debug level.
 
         Returns:
             A tuple of ``(updated_locales_dict, to_be_translated)``,
@@ -152,13 +152,13 @@ class Builder:
             translation dictionary and ``to_be_translated`` maps
             locales to lists of untranslated ``StringData``.
         """
-        lg = logger.debug if log else lambda x: None
+        debug_log = logger.debug if verbose else lambda x: None
         str_id_dict: dict[str, StringData] = {}
         for file in self.project_files:
-            for sd in self.extract_strings(file):
-                if not sd.string:  # 跳过空字符串 _("")
+            for string_data in self.extract_strings(file):
+                if not string_data.string:  # 跳过空字符串 _("")
                     continue
-                str_id_dict[gen_id(sd.string)] = sd
+                str_id_dict[generate_id(string_data.string)] = string_data
 
         updated_locales_dict = copy.deepcopy(self._locales_dict)
         to_be_translated: dict[str, list[StringData]] = {}
@@ -166,24 +166,24 @@ class Builder:
         for locale in self.to_locales:
             if locale not in updated_locales_dict:
                 updated_locales_dict.setdefault(locale, {})
-                lg(f"New locale: {locale}")
+                debug_log(f"New locale: {locale}")
         # 移除过期语言
         for locale in list(self._locales_dict.keys()):
             if locale not in self.to_locales and locale in updated_locales_dict:
                 del updated_locales_dict[locale]
-                lg(f"Stale locale: {locale}")
-        updated_locales_id_dict = self.locales_dict_to_id_dict(updated_locales_dict)
+                debug_log(f"Stale locale: {locale}")
+        updated_locales_id_dict = self.extract_locale_ids(updated_locales_dict)
         # 添加新翻译
-        for trans_id, sd in str_id_dict.items():
+        for trans_id, string_data in str_id_dict.items():
             for locale in updated_locales_dict:
                 if trans_id in updated_locales_dict[locale]:
                     continue
 
                 to_be_translated.setdefault(locale, [])
-                if sd.string not in to_be_translated[locale]:
-                    to_be_translated[locale].append(sd)
+                if string_data.string not in to_be_translated[locale]:
+                    to_be_translated[locale].append(string_data)
 
-                lg(f"New text: {locale} - {f'{sd.string[:30]}...' if sd.string[30:] else sd.string}")
+                debug_log(f"New text: {locale} - {f'{string_data.string[:30]}...' if string_data.string[30:] else string_data.string}")
         # 移除过期翻译
         for locale in updated_locales_id_dict:
             for trans_id in list(updated_locales_id_dict[locale]):
@@ -192,7 +192,7 @@ class Builder:
                 if trans_id not in updated_locales_dict[locale]:
                     continue
                 del updated_locales_dict[locale][trans_id]
-                lg(f"Stale text: {locale} - {trans_id}")
+                debug_log(f"Stale text: {locale} - {trans_id}")
         return updated_locales_dict, to_be_translated
 
     def load_file(self) -> list[Path]:
@@ -235,10 +235,10 @@ class Builder:
             the existing translation files.
         """
 
-        updated_locale_dict, to_be_translated = self.check_changes(log=False)
+        updated_locale_dict, to_be_translated = self.compute_changes(verbose=False)
         return bool(updated_locale_dict != self._locales_dict or to_be_translated)
 
-    async def item_translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
+    async def translate_items(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
         """Translate texts one by one.
 
         Args:
@@ -249,7 +249,7 @@ class Builder:
             A dictionary of translated texts keyed by ID.
         """
         result: dict[str, str] = {}
-        pbar = self.pbar(to_locale, len(text_id_dict))
+        progress_bar = self.progress_bar(to_locale, len(text_id_dict))
 
         semaphore = asyncio.Semaphore(self.max_concurrency)
         translator = self.translator
@@ -259,7 +259,7 @@ class Builder:
         async def _translate_one(text: str, locale: str, sem: asyncio.Semaphore) -> str:
             async with sem:
                 translated = await translator.translate(text, locale)
-                pbar.update()
+                progress_bar.update()
                 return translated
 
         tasks: dict[str, asyncio.Task] = {
@@ -267,7 +267,7 @@ class Builder:
         }
 
         done, _ = await asyncio.wait(tasks.values())
-        pbar.close()
+        progress_bar.close()
 
         for key, task in tasks.items():
             try:
@@ -279,7 +279,7 @@ class Builder:
 
         return result
 
-    async def bulk_translation(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
+    async def translate_bulk(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
         """Translate texts in bulk.
 
         Args:
@@ -292,21 +292,21 @@ class Builder:
         translator = self.translator
         if not isinstance(translator, BaseBulkTranslator):
             raise ValueError("Invalid translator type")
-        with self.pbar(to_locale, 1) as pbar:
+        with self.progress_bar(to_locale, 1) as progress_bar:
             all_results: dict[str, str] = {}
             items = list(text_id_dict.items())
             for i in range(0, len(items), self.max_concurrency):
                 batch = dict(items[i : i + self.max_concurrency])
                 batch_results = await translator.translate(batch, to_locale)
                 all_results |= batch_results
-            pbar.update()
+            progress_bar.update()
         return all_results
 
-    async def translate(self, text_list: dict[str, str], to_locale: str) -> dict[str, str]:
+    async def translate(self, text_dict: dict[str, str], to_locale: str) -> dict[str, str]:
         if isinstance(self.translator, BaseItemTranslator):
-            return await self.item_translate(text_list, to_locale)
+            return await self.translate_items(text_dict, to_locale)
         elif isinstance(self.translator, BaseBulkTranslator):
-            return await self.bulk_translation(text_list, to_locale)
+            return await self.translate_bulk(text_dict, to_locale)
         else:
             raise ValueError("Invalid translator type")
 
@@ -339,7 +339,7 @@ class Builder:
             yaml.dump(locale_dict, f, allow_unicode=True)
 
     @staticmethod
-    def locales_dict_to_id_dict(locales_dict: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
+    def extract_locale_ids(locales_dict: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
         """Extract all translation IDs from a locales dictionary.
 
         Args:
@@ -355,7 +355,7 @@ class Builder:
 
         return {locale: list(locale_dict) for locale, locale_dict in locales_dict.items()}
 
-    def pbar(self, locale: str, total: int) -> tqdm:
+    def progress_bar(self, locale: str, total: int) -> tqdm:
         try:
             from tqdm import tqdm
         except ImportError as e:

@@ -2,7 +2,7 @@ import hashlib
 from pathlib import Path
 
 
-def gen_id(text: object) -> str:
+def generate_id(text: object) -> str:
     """Generate a unique 12-character hex ID from the given text.
 
     Args:

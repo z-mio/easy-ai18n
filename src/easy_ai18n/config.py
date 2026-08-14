@@ -13,4 +13,4 @@ class I18nConfig:
     """Default separator between text parts."""
 
 
-ic = I18nConfig()
+i18n_config = I18nConfig()

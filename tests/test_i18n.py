@@ -9,7 +9,7 @@ from easy_ai18n.translator import BaseItemTranslator
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
 
 
-class SameTextTranslator(BaseItemTranslator):
+class NoOpTranslator(BaseItemTranslator):
     async def translate(self, text: str, target_lang: str) -> str:
         return text
 
@@ -20,7 +20,7 @@ def test_build(tmp_path):
         project_root="tests",
         to_locales=["en", "ja"],
         include=["test_i18n.py"],
-        translator=SameTextTranslator(),
+        translator=NoOpTranslator(),
         show_progress=False,
     )
     assert i18n.locales_dir.joinpath("en.yaml").exists()
@@ -40,7 +40,7 @@ def test_build_rejects_await_in_f_string(tmp_path):
             project_root=tmp_path,
             to_locales=["en"],
             include=[source.name],
-            translator=SameTextTranslator(),
+            translator=NoOpTranslator(),
             show_progress=False,
         )
 
@@ -61,7 +61,7 @@ def test_build_allows_await_before_f_string(tmp_path):
         project_root=tmp_path,
         to_locales=["en"],
         include=[source.name],
-        translator=SameTextTranslator(),
+        translator=NoOpTranslator(),
         show_progress=False,
     )
 

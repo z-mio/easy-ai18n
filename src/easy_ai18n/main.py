@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from .config import ic
+from .config import i18n_config
 from .core.i18n import I18n, PostLocaleSelector, PreLocaleSelector
 from .translator.base import BaseBulkTranslator, BaseItemTranslator
 from .utils import to_list
@@ -26,9 +26,9 @@ class EasyAI18n:
             locales_dir: The directory for YAML translation files
                 (defaults to ``./i18n``).
         """
-        self.func_names = to_list(func_names) or ic.func_names
-        self.sep = sep or ic.sep
-        self.locales_dir = Path(locales_dir) if locales_dir else ic.locales_dir
+        self.func_names = to_list(func_names) or i18n_config.func_names
+        self.sep = sep or i18n_config.sep
+        self.locales_dir = Path(locales_dir) if locales_dir else i18n_config.locales_dir
         self.locales_dir.mkdir(parents=True, exist_ok=True)
 
     def build(

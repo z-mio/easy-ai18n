@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING, Self, SupportsIndex, overload
 
 from loguru import logger
 
-from ..config import ic
-from ..utils import gen_id
+from ..config import i18n_config
+from ..utils import generate_id
 from .loader import Loader
 from .parser import ASTParser, StringData
 
@@ -203,7 +203,7 @@ class PostLocaleSelector:
     def get_by_text(self, text: str, locale: str | None = None) -> str:
         if locale is None:
             return text
-        return self.locales_dict.get(locale, {}).get(gen_id(text), text)
+        return self.locales_dict.get(locale, {}).get(generate_id(text), text)
 
 
 class I18n:
@@ -236,9 +236,9 @@ class I18n:
         if self.enabled_locales and self.default_locale and self.default_locale not in self.enabled_locales:
             self.enabled_locales.append(self.default_locale)
 
-        self.sep = sep or ic.sep
-        self.locales_dir = locales_dir or ic.locales_dir
-        self.func_names = func_names or ic.func_names
+        self.sep = sep or i18n_config.sep
+        self.locales_dir = locales_dir or i18n_config.locales_dir
+        self.func_names = func_names or i18n_config.func_names
         self.pre_locale_selector = pre_locale_selector or PreLocaleSelector
         self.post_locale_selector = post_locale_selector or PostLocaleSelector
         self.content = LocaleContent
@@ -276,7 +276,7 @@ class I18n:
             f.f_code.co_name,
             f.f_code.co_filename,
         )
-        cache_key = gen_id(positions)
+        cache_key = generate_id(positions)
 
         # 解析错误的内容直接返回原文
         if cache_key in self._parse_failures:
