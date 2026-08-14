@@ -3,7 +3,6 @@
 """
 
 import asyncio
-import os
 from pprint import PrettyPrinter
 
 from pydantic import BaseModel, Field
@@ -12,10 +11,10 @@ from ..errors import BuildDependencyError, TranslationError
 from .base import BaseBulkTranslator, BaseItemTranslator
 
 try:
-    import instructor
     from googletrans import Translator as Gt
-    from instructor.core import InstructorRetryException
-    from openai import AsyncOpenAI
+    from pydantic_ai import Agent
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
 except ImportError as e:
     raise BuildDependencyError() from e
 
@@ -49,6 +48,8 @@ class GoogleTranslator(BaseItemTranslator):
 
 
 class BaseOpenAITranslator:
+    """OpenAI 翻译器基础配置"""
+
     def __init__(
         self,
         api_key: str | None = None,
@@ -56,12 +57,20 @@ class BaseOpenAITranslator:
         model: str | None = None,
         prompt: str = TRANSLATE_PROMPT,
     ):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY 未配置")
-        self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
+        self.api_key = api_key
+        self.base_url = base_url
         self.model = model or "gpt-5-mini"
         self.prompt = prompt
+
+    def _create_model(self) -> OpenAIChatModel:
+        """创建 OpenAI Chat Model。"""
+        return OpenAIChatModel(
+            self.model,
+            provider=OpenAIProvider(
+                api_key=self.api_key,
+                base_url=self.base_url,
+            ),
+        )
 
 
 class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
@@ -81,42 +90,24 @@ class OpenAIItemTranslator(BaseItemTranslator, BaseOpenAITranslator):
         :param prompt: 提示词
         """
         BaseOpenAITranslator.__init__(self, api_key, base_url, model, prompt)
-        self.client = AsyncOpenAI(api_key=self.api_key, base_url=self.base_url)
+        self._agent = Agent[object, str](
+            self._create_model(),
+            system_prompt=self.prompt,
+            model_settings={"temperature": 0, "thinking": False},
+            retries=3,
+        )
 
     async def translate(self, text: str, target_lang: str) -> str:
-        """
-        gpt翻译
-        """
-        last_exc: Exception | None = None
-        for _ in range(3):
-            try:
-                response = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": self.prompt,
-                        },
-                        {
-                            "role": "user",
-                            "content": f"Translate the text to {target_lang}:\n{text}",
-                        },
-                    ],
-                    temperature=0,
-                )
-            except Exception as e:
-                last_exc = e
-                await asyncio.sleep(1.5)
-            else:
-                content = response.choices[0].message.content
-                if content is None:
-                    raise TranslationError("OpenAI翻译结果为空")
-                return content
-        raise TranslationError(f"OpenAI翻译错误: {last_exc}") from last_exc
+        """GPT 逐条翻译。"""
+
+        result = await self._agent.run(
+            f"Translate the text to {target_lang}:\n{text}",
+        )
+        return result.output
 
 
 class TranslatorResult(BaseModel):
-    key: str = Field(..., description="key")
+    key: str = Field(..., pattern=r"^[0-9a-fA-F]{12}$", strict=True, description="key")
     value: str = Field(..., description="value")
 
 
@@ -137,36 +128,26 @@ class OpenAIBulkTranslator(BaseBulkTranslator, BaseOpenAITranslator):
         :param prompt: 提示词
         """
         BaseOpenAITranslator.__init__(self, api_key, base_url, model, prompt)
-        self.client = instructor.from_openai(AsyncOpenAI(api_key=api_key, base_url=base_url))
+        self._agent = Agent[object, list[TranslatorResult]](
+            model=self._create_model(),
+            output_type=list[TranslatorResult],
+            system_prompt=self.prompt,
+            model_settings={"temperature": 0, "thinking": False},
+            retries=3,
+        )
 
     async def translate(self, text_id_dict: dict, target_lang: str) -> dict:
         """
-        :param text_id_dict: 文本id字典, 格式 {"text_id": "text"}
+        :param text_id_dict: 文本id字典，格式 {"text_id": "text"}
         :param target_lang: 目标语言
         :return: 合并后的翻译结果字典
         """
         try:
             text = PrettyPrinter().pformat(text_id_dict)
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": self.prompt,
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Translate the text to {target_lang}:\n{text}",
-                    },
-                ],
-                response_model=list[TranslatorResult],
-                max_retries=3,
-                temperature=0,
+            response = await self._agent.run(
+                f"Translate the text to {target_lang}:\n{text}",
             )
-        except InstructorRetryException as e:
-            message = e.messages[-1]["content"] if e.messages else str(e)
-            raise TranslationError(f"OpenAI翻译结果验证错误: {message}") from e
         except Exception as e:
             raise TranslationError(f"OpenAI翻译错误: {e}") from e
-        else:
-            return {kv.key: kv.value for kv in response}
+
+        return {item.key: item.value for item in response.output}

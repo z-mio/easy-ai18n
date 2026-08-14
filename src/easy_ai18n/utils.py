@@ -6,7 +6,7 @@ def gen_id(text: object) -> str:
     """
     生成唯一ID
     :param text: 输入字符串
-    :return: 32位的十六进制字符串
+    :return: 12位的十六进制字符串
     """
     text = str(text).encode("utf-8")
     return hashlib.md5(text).hexdigest()[:12]

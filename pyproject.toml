@@ -17,9 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 build = [
     "googletrans>=4.0.2",
-    "instructor>=1.15.1",
     "tqdm>=4.67.3",
-    "openai>=2.54.0",
+    "pydantic-ai-slim[openai]>=2.29.0",
 ]
 
 [dependency-groups]

@@ -110,6 +110,12 @@ print(_("Hello, world!"))
 
 ### 🤖 Use AI for Translation
 
+AI translation and automatic build dependencies are installed through the `build` extra:
+
+```shell
+pip install "easy-ai18n[build]"
+```
+
 ```python
 from easy_ai18n import EasyAI18n
 from easy_ai18n.translator import OpenAIBulkTranslator
