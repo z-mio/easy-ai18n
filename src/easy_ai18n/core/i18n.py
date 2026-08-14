@@ -233,7 +233,7 @@ class I18n:
         self._parse_failures: set[str] = set()
 
         self.default_locale = default_locale
-        self.enabled_locales = enabled_locales
+        self.enabled_locales = list(enabled_locales) if enabled_locales else None
         if self.enabled_locales and self.default_locale and self.default_locale not in self.enabled_locales:
             self.enabled_locales.append(self.default_locale)
 
@@ -309,8 +309,6 @@ class I18n:
                 locales_dict=self.locales_dict,
                 post_locale_selector=self.post_locale_selector,
             )
-        finally:
-            del f
 
     def _handle_cache(self, original: str, cache_key: str, result: StringData | None) -> LocaleContent:
         """Handle the cache entry and return the result.
@@ -330,7 +328,7 @@ class I18n:
         """
         if not result:
             self._parse_failures.add(cache_key)
-            logger.exception(f"I18N parse error: {original}")
+            logger.error(f"I18N parse error: {original}")
             return self.content(
                 text=original,
                 locales_dict=self.locales_dict,

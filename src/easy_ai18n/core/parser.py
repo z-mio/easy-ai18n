@@ -198,7 +198,7 @@ class StringConstructor:
         Returns:
             The conversion character, or ``None`` if no conversion.
         """
-        return {97: "a", 114: "r", 115: "s"}[conversion] if conversion != -1 else None
+        return {97: "a", 114: "r", 115: "s"}.get(conversion) if conversion != -1 else None
 
     def _parse_format_spec(
         self,

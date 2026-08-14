@@ -68,11 +68,17 @@ class Builder:
             raise BuildError("to_locales is not configured")
         self.to_locales = to_locales
         self.locales_dir = to_path(locales_dir) or i18n_config.locales_dir
-        self.translator: BaseItemTranslator | BaseBulkTranslator = translator or GoogleTranslator()
+        self.translator: BaseItemTranslator | BaseBulkTranslator = (
+            translator if translator is not None else GoogleTranslator()
+        )
 
         self.project_files = self.load_file()
         self.show_progress = show_progress
-        self.max_concurrency = max_concurrency or (30 if isinstance(self.translator, BaseItemTranslator) else 50)
+        self.max_concurrency = (
+            max_concurrency
+            if max_concurrency is not None
+            else (30 if isinstance(self.translator, BaseItemTranslator) else 50)
+        )
         self._locales_dict = Loader(self.locales_dir).load_locales_file(self.to_locales)
 
     async def run(self) -> None:
@@ -83,10 +89,8 @@ class Builder:
         logger.info("Content changed, updating...")
         if await self.build():
             logger.success("Update complete")
-            return
         else:
             logger.error("Build failed")
-            return
 
     async def build(self, save_to_file: bool = True) -> bool:
         """Build the translation dictionary.
@@ -103,6 +107,7 @@ class Builder:
         """
         updated_locales_dict, to_be_translated = self.compute_changes()
 
+        has_failures = False
         for locale, string_data_list in to_be_translated.items():
             try:
                 id_to_string_data = {
@@ -130,8 +135,10 @@ class Builder:
                         translated_result[k] = text
             except TranslationError:
                 logger.error(f"Translation to {locale} failed")
+                has_failures = True
             except Exception:
                 logger.exception(f"Unexpected error translating to {locale}:")
+                has_failures = True
             else:
                 updated_locales_dict.setdefault(locale, {})
                 updated_locales_dict[locale] |= translated_result
@@ -139,7 +146,7 @@ class Builder:
         if save_to_file:
             for locale in updated_locales_dict:
                 self.save_to_yaml(updated_locales_dict[locale], locale)
-        return True
+        return not has_failures
 
     def compute_changes(self, verbose: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
         """Compute changes between source strings and existing translations.
@@ -184,7 +191,7 @@ class Builder:
                     continue
 
                 to_be_translated.setdefault(locale, [])
-                if string_data.string not in to_be_translated[locale]:
+                if trans_id not in {generate_id(string_data.string) for string_data in to_be_translated[locale]}:
                     to_be_translated[locale].append(string_data)
 
                 debug_log(
@@ -274,7 +281,9 @@ class Builder:
             key: asyncio.create_task(_translate_one(text, to_locale, semaphore)) for key, text in text_id_dict.items()
         }
 
-        done, _ = await asyncio.wait(tasks.values())
+        done, pending = await asyncio.wait(tasks.values(), timeout=300)
+        for task in pending:
+            task.cancel()
         progress_bar.close()
 
         for key, task in tasks.items():
