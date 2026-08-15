@@ -6,7 +6,7 @@ import inspect
 import sys
 from pathlib import Path
 from types import FrameType
-from typing import TYPE_CHECKING, Self, SupportsIndex, overload
+from typing import TYPE_CHECKING, Self, SupportsIndex
 
 from loguru import logger
 
@@ -99,12 +99,6 @@ class LocaleContent(str):
 
     def __repr__(self) -> str:
         return self.__call__(self._locale)
-
-    @overload
-    def __getitem__(self, locale: SupportsIndex | slice) -> str: ...
-
-    @overload
-    def __getitem__(self, locale: str | None) -> str: ...
 
     def __getitem__(self, locale: SupportsIndex | slice | str | None) -> str:
         """Select a locale via ``_[locale]`` syntax.

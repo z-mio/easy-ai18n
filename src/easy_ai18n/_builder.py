@@ -30,7 +30,7 @@ class Builder:
         sep: str,
         func_names: list[str],
         locales_dir: Path,
-        to_locales: list[str] | None = None,
+        to_locales: list[str],
         project_root: Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
@@ -62,8 +62,6 @@ class Builder:
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
         self.func_names = func_names
         self.sep = sep
-        if to_locales is None:
-            raise BuildError("to_locales is not configured")
         self.to_locales = to_locales
         self.locales_dir = locales_dir
         self.translator: BaseItemTranslator | BaseBulkTranslator = (
