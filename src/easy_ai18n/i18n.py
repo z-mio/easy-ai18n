@@ -35,7 +35,7 @@ class PreLocaleSelector[L]:
     def __init__(self, *, i18n: "I18n[L]", sep: str, locale: L):
         self.i18n = i18n
         self.sep = sep
-        self.locale: L = locale
+        self.locale = locale
 
     def __str__(self) -> str:
         return ""
@@ -101,7 +101,7 @@ class LocaleContent[L](str):
         return self.__call__(self._locale)
 
     def __getitem__(self, locale: SupportsIndex | slice | L) -> str:
-        """Select a locale via ``_[locale]`` syntax.
+        """Select a locale via ``_("text")[locale]`` syntax.
 
         Args:
             locale: The locale identifier to retrieve.
@@ -114,7 +114,7 @@ class LocaleContent[L](str):
         return self.__call__(locale)
 
     def __call__(self, locale: L | str) -> str:
-        """Select a locale via ``_(locale)`` syntax.
+        """Select a locale via ``_("text")(locale)`` syntax.
 
         Args:
             locale: The locale identifier to retrieve.
@@ -180,31 +180,26 @@ class PostLocaleSelector[L]:
         """
         return self.format(locale)
 
-    def format(self, locale: L | str | None = None) -> str:
+    def format(self, locale: L | str) -> str:
         """Format the string and apply translation.
 
         Args:
-            locale: The locale code to translate to. If ``None`` or
-                not a string, the original text is returned with
-                variables substituted.
+            locale: The locale code to translate to. If not a string,
+                the original text is returned with variables
+                substituted.
 
         Returns:
             The formatted and translated string.
         """
-        if not isinstance(locale, str) or not locale:
+        if not isinstance(locale, str):
             return self._format(self.text)
-        translated = self.get_by_text(self.text, locale)
+        translated = self.locales.get(locale, {}).get(Text.id_of(self.text), self.text)
         return self._format(translated)
 
     def _format(self, raw_string: str) -> str:
         for v in self.variables:
             raw_string = raw_string.replace(v, str(self.variables[v]))
         return raw_string
-
-    def get_by_text(self, text: str, locale: str | None = None) -> str:
-        if locale is None:
-            return text
-        return self.locales.get(locale, {}).get(Text.id_of(text), text)
 
 
 class I18n[L]:
@@ -215,7 +210,6 @@ class I18n[L]:
         locales_dir: Path,
         func_names: list[str],
         source_locale: str,
-        enabled_locales: list[str] | None = None,
         default_locale: str | None = None,
         pre_locale_selector: type[PreLocaleSelector[L]] | None = None,
         post_locale_selector: type[PostLocaleSelector[L]] | None = None,
@@ -229,7 +223,6 @@ class I18n[L]:
                 recognize during AST parsing.
             source_locale: The source language of the translatable
                 strings (e.g. ``"zh-hans"``).
-            enabled_locales: The list of enabled language codes.
             default_locale: The default locale code. Defaults to
                 ``source_locale``.
             pre_locale_selector: The pre-call locale selector class.
@@ -240,9 +233,6 @@ class I18n[L]:
 
         self.source_locale = source_locale
         self.default_locale = default_locale or source_locale
-        self.enabled_locales = list(enabled_locales) if enabled_locales else None
-        if self.enabled_locales and self.default_locale not in self.enabled_locales:
-            self.enabled_locales.append(self.default_locale)
 
         self.sep = sep
         self.locales_dir = locales_dir
@@ -250,7 +240,7 @@ class I18n[L]:
         self.pre_locale_selector: type[PreLocaleSelector[L]] = pre_locale_selector or PreLocaleSelector[L]
         self.post_locale_selector: type[PostLocaleSelector[L]] = post_locale_selector or PostLocaleSelector[L]
         self.content: type[LocaleContent[L]] = LocaleContent[L]
-        self.locales = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
+        self.locales = Loader(self.locales_dir).load_locales_file()
 
     def t(self, *args: object, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent[L]:
         """Translate text by parsing the caller's AST node.
