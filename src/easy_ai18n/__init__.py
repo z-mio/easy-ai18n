@@ -54,7 +54,6 @@ class EasyAI18n:
         exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
         max_concurrency: int | None = None,
-        show_progress: bool = True,
     ) -> None:
         """Build translation files (synchronous wrapper).
 
@@ -67,8 +66,6 @@ class EasyAI18n:
                 ``GoogleTranslator``.
             max_concurrency: The maximum number of concurrent
                 translation tasks.
-            show_progress: Whether to show the translation progress
-                bar.
         """
         return asyncio.run(
             self.build_async(
@@ -78,7 +75,6 @@ class EasyAI18n:
                 exclude=exclude,
                 translator=translator,
                 max_concurrency=max_concurrency,
-                show_progress=show_progress,
             )
         )
 
@@ -91,7 +87,6 @@ class EasyAI18n:
         exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
         max_concurrency: int | None = None,
-        show_progress: bool = True,
     ) -> None:
         """Build translation files asynchronously.
 
@@ -118,7 +113,6 @@ class EasyAI18n:
             include=include,
             exclude=exclude,
             translator=translator,
-            show_progress=show_progress,
             max_concurrency=max_concurrency,
             source_locale=self.source_locale,
         )

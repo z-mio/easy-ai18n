@@ -9,7 +9,7 @@ import asyncio
 import copy
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import yaml
 from loguru import logger
@@ -17,11 +17,8 @@ from loguru import logger
 from ._loader import Loader
 from ._parser import ASTParser, StringData
 from ._utils import generate_id
-from .errors import BuildDependencyError, BuildError, TranslationError
+from .errors import BuildError, TranslationError
 from .translators import BaseBulkTranslator, BaseItemTranslator, GoogleTranslator
-
-if TYPE_CHECKING:
-    from tqdm import tqdm
 
 
 class Builder:
@@ -37,7 +34,6 @@ class Builder:
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         translator: BaseItemTranslator | BaseBulkTranslator | None = None,
-        show_progress: bool = True,
         max_concurrency: int | None = None,
     ):
         """Set up the translation build pipeline.
@@ -55,8 +51,6 @@ class Builder:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
-            show_progress: Whether to show the translation progress
-                bar.
             max_concurrency: The maximum number of concurrent
                 translation tasks.
         """
@@ -74,7 +68,6 @@ class Builder:
         )
 
         self.project_files = self.load_file()
-        self.show_progress = show_progress
         self.max_concurrency = (
             max_concurrency
             if max_concurrency is not None
@@ -111,10 +104,7 @@ class Builder:
         has_failures = False
         for locale, string_data_list in to_be_translated.items():
             try:
-                id_to_string_data = {
-                    generate_id(string_data.string): string_data for string_data in string_data_list
-                }  # 原文id字典
-                # 变量替换
+                id_to_string_data = {generate_id(string_data.string): string_data for string_data in string_data_list}
                 text_dict = {}
                 for k, string_data in id_to_string_data.items():
                     if string_data.variables:
@@ -124,10 +114,9 @@ class Builder:
                         text_dict[k] = text
                     else:
                         text_dict[k] = string_data.string
-                # 翻译
+
                 translated_result = await self.translate(text_dict, locale)
 
-                # 还原变量
                 for k, string_data in id_to_string_data.items():
                     if string_data.variables:
                         text = translated_result[k]
@@ -149,7 +138,7 @@ class Builder:
                 self.save_to_yaml(updated_locales_dict[locale], locale)
         return not has_failures
 
-    def compute_changes(self, verbose: bool = True) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
+    def compute_changes(self) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
         """Compute changes between source strings and existing translations.
 
         Identifies new strings that need translation and removes
@@ -164,28 +153,22 @@ class Builder:
             translation dictionary and ``to_be_translated`` maps
             locales to lists of untranslated ``StringData``.
         """
-        debug_log = logger.debug if verbose else lambda x: None
         id_to_string_data: dict[str, StringData] = {}
         for file in self.project_files:
             for string_data in self.extract_strings(file):
-                if not string_data.string:  # 跳过空字符串 _("")
+                if not string_data.string:
                     continue
                 id_to_string_data[generate_id(string_data.string)] = string_data
 
         updated_locales_dict = copy.deepcopy(self._locales_dict)
         to_be_translated: dict[str, list[StringData]] = {}
-        # 添加新语言
         for locale in self.to_locales:
             if locale not in updated_locales_dict:
                 updated_locales_dict.setdefault(locale, {})
-                debug_log(f"New locale: {locale}")
-        # 移除过期语言
         for locale in list(self._locales_dict.keys()):
             if locale not in self.to_locales and locale in updated_locales_dict:
                 del updated_locales_dict[locale]
-                debug_log(f"Stale locale: {locale}")
         updated_locales_id_dict = self.extract_locale_ids(updated_locales_dict)
-        # 添加新翻译
         for trans_id, string_data in id_to_string_data.items():
             for locale in updated_locales_dict:
                 if trans_id in updated_locales_dict[locale]:
@@ -195,12 +178,6 @@ class Builder:
                 if trans_id not in {generate_id(string_data.string) for string_data in to_be_translated[locale]}:
                     to_be_translated[locale].append(string_data)
 
-                debug_log(
-                    f"New text: {locale} - {
-                        f'{string_data.string[:30]}...' if string_data.string[30:] else string_data.string
-                    }"
-                )
-        # 移除过期翻译
         for locale in updated_locales_id_dict:
             for trans_id in list(updated_locales_id_dict[locale]):
                 if trans_id in id_to_string_data:
@@ -208,7 +185,6 @@ class Builder:
                 if trans_id not in updated_locales_dict[locale]:
                     continue
                 del updated_locales_dict[locale][trans_id]
-                debug_log(f"Stale text: {locale} - {trans_id}")
         return updated_locales_dict, to_be_translated
 
     def load_file(self) -> list[Path]:
@@ -217,7 +193,6 @@ class Builder:
         exclude_paths = [Path(p) for p in self.exclude]
 
         for root, dirs, files in self.project_root.walk():
-            # 先做目录排除
             dirs[:] = [
                 d
                 for d in dirs
@@ -251,7 +226,7 @@ class Builder:
             the existing translation files.
         """
 
-        updated_locale_dict, to_be_translated = self.compute_changes(verbose=False)
+        updated_locale_dict, to_be_translated = self.compute_changes()
         return bool(updated_locale_dict != self._locales_dict or to_be_translated)
 
     async def translate_items(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
@@ -265,7 +240,6 @@ class Builder:
             A dictionary of translated texts keyed by ID.
         """
         result: dict[str, str] = {}
-        progress_bar = self.progress_bar(to_locale, len(text_id_dict))
 
         semaphore = asyncio.Semaphore(self.max_concurrency)
         translator = self.translator
@@ -274,9 +248,7 @@ class Builder:
 
         async def _translate_one(text: str, locale: str, sem: asyncio.Semaphore) -> str:
             async with sem:
-                translated = await translator.translate(text, locale)
-                progress_bar.update()
-                return translated
+                return await translator.translate(text, locale)
 
         tasks: dict[str, asyncio.Task] = {
             key: asyncio.create_task(_translate_one(text, to_locale, semaphore)) for key, text in text_id_dict.items()
@@ -285,7 +257,6 @@ class Builder:
         done, pending = await asyncio.wait(tasks.values(), timeout=300)
         for task in pending:
             task.cancel()
-        progress_bar.close()
 
         for key, task in tasks.items():
             try:
@@ -312,14 +283,12 @@ class Builder:
         translator = self.translator
         if not isinstance(translator, BaseBulkTranslator):
             raise BuildError("translate_bulk requires a BaseBulkTranslator")
-        with self.progress_bar(to_locale, 1) as progress_bar:
-            all_results: dict[str, str] = {}
-            items = list(text_id_dict.items())
-            for i in range(0, len(items), self.max_concurrency):
-                batch = dict(items[i : i + self.max_concurrency])
-                batch_results = await translator.translate(batch, to_locale)
-                all_results |= batch_results
-            progress_bar.update()
+        items = list(text_id_dict.items())
+        all_results: dict[str, str] = {}
+        for i in range(0, len(items), self.max_concurrency):
+            batch = dict(items[i : i + self.max_concurrency])
+            batch_results = await translator.translate(batch, to_locale)
+            all_results |= batch_results
         return all_results
 
     async def translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
@@ -374,19 +343,3 @@ class Builder:
             return {}
 
         return {locale: list(locale_dict) for locale, locale_dict in locales_dict.items()}
-
-    def progress_bar(self, locale: str, total: int) -> tqdm:
-        try:
-            from tqdm import tqdm
-        except ImportError as e:
-            raise BuildDependencyError() from e
-
-        return tqdm(
-            total=total,
-            desc=f"⏳ Translating → {locale}",
-            unit="items",
-            ncols=80,
-            bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
-            colour="blue",
-            disable=not self.show_progress,
-        )
