@@ -85,7 +85,7 @@ class LocaleContent[L](str):
         text: str,
         locales_dict: dict[str, dict[str, str]],
         variables: dict[str, object] | None = None,
-        locale: str | None = None,
+        locale: str,
         post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
     ):
         self._text = text
@@ -113,7 +113,7 @@ class LocaleContent[L](str):
             return super().__getitem__(locale)
         return self.__call__(locale)
 
-    def __call__(self, locale: L | str | None) -> str:
+    def __call__(self, locale: L | str) -> str:
         """Select a locale via ``_(locale)`` syntax.
 
         Args:
@@ -147,7 +147,7 @@ class PostLocaleSelector[L]:
         text: str,
         locales_dict: dict[str, dict[str, str]],
         variables: dict[str, object] | None = None,
-        locale: L | str | None = None,
+        locale: L | str,
     ):
         """Initialize PostLocaleSelector.
 
@@ -169,7 +169,7 @@ class PostLocaleSelector[L]:
     def __repr__(self) -> str:
         return self.__getitem__(self.locale)
 
-    def __getitem__(self, locale: L | str | None) -> str:
+    def __getitem__(self, locale: L | str) -> str:
         """Select a locale via ``[locale]`` syntax.
 
         Args:
@@ -210,9 +210,11 @@ class PostLocaleSelector[L]:
 class I18n[L]:
     def __init__(
         self,
+        *,
         sep: str,
         locales_dir: Path,
         func_names: list[str],
+        source_locale: str,
         enabled_locales: list[str] | None = None,
         default_locale: str | None = None,
         pre_locale_selector: type[PreLocaleSelector[L]] | None = None,
@@ -221,8 +223,11 @@ class I18n[L]:
         """Initialize I18n.
 
         Args:
+            source_locale: The source language of the translatable
+                strings (e.g. ``"zh-Hans"``).
             enabled_locales: The list of enabled language codes.
-            default_locale: The default locale code.
+            default_locale: The default locale code. Defaults to
+                ``source_locale``.
             sep: The separator between text parts.
             func_names: The names of translation functions to
                 recognize during AST parsing.
@@ -232,9 +237,10 @@ class I18n[L]:
         self._cache: dict[str, ast.Call] = {}
         self._parse_failures: set[str] = set()
 
-        self.default_locale = default_locale
+        self.source_locale = source_locale
+        self.default_locale = default_locale or source_locale
         self.enabled_locales = list(enabled_locales) if enabled_locales else None
-        if self.enabled_locales and self.default_locale and self.default_locale not in self.enabled_locales:
+        if self.enabled_locales and self.default_locale not in self.enabled_locales:
             self.enabled_locales.append(self.default_locale)
 
         self.sep = sep
@@ -269,6 +275,7 @@ class I18n[L]:
             return self.content(
                 text=original,
                 locales_dict=self.locales_dict,
+                locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
         positions = (
@@ -283,6 +290,7 @@ class I18n[L]:
             return self.content(
                 text=original,
                 locales_dict=self.locales_dict,
+                locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
 
@@ -297,6 +305,7 @@ class I18n[L]:
             return self.content(
                 text=original,
                 locales_dict=self.locales_dict,
+                locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
         except Exception:
@@ -305,6 +314,7 @@ class I18n[L]:
             return self.content(
                 text=original,
                 locales_dict=self.locales_dict,
+                locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
 
@@ -330,6 +340,7 @@ class I18n[L]:
             return self.content(
                 text=original,
                 locales_dict=self.locales_dict,
+                locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
 

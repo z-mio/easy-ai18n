@@ -27,10 +27,12 @@ if TYPE_CHECKING:
 class Builder:
     def __init__(
         self,
+        *,
         sep: str,
         func_names: list[str],
         locales_dir: Path,
         to_locales: list[str],
+        source_locale: str,
         project_root: Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
@@ -55,6 +57,8 @@ class Builder:
                 bar.
             max_concurrency: The maximum number of concurrent
                 translation tasks.
+            source_locale: The source language of the translatable
+                strings.
         """
         self.project_root = project_root or Path(os.getcwd())
         self.include = include or []
@@ -62,8 +66,9 @@ class Builder:
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
         self.func_names = func_names
         self.sep = sep
-        self.to_locales = to_locales
+        self.to_locales = [i.lower() for i in to_locales]
         self.locales_dir = locales_dir
+        self.source_locale = source_locale
         self.translator: BaseItemTranslator | BaseBulkTranslator = (
             translator if translator is not None else GoogleTranslator()
         )

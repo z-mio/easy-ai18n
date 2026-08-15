@@ -21,6 +21,7 @@ __all__ = [
 class EasyAI18n:
     def __init__(
         self,
+        source_locale: str,
         func_names: str | list[str] | None = None,
         sep: str | None = None,
         locales_dir: str | Path | None = None,
@@ -28,6 +29,8 @@ class EasyAI18n:
         """Initialize EasyAI18n.
 
         Args:
+            source_locale: The source language of the translatable
+                strings (e.g. ``"zh-Hans"``).
             func_names: The names of translation functions to
                 recognize (defaults to ``["_"]``).
             sep: The separator between text parts (defaults to
@@ -35,6 +38,7 @@ class EasyAI18n:
             locales_dir: The directory for YAML translation files
                 (defaults to ``./i18n``).
         """
+        self.source_locale = source_locale.lower()
         self.func_names = func_names if isinstance(func_names, list) else [func_names] if func_names else ["_"]
         self.sep = sep or " "
         self.locales_dir = Path(locales_dir) if locales_dir else Path.cwd() / "i18n"
@@ -115,6 +119,7 @@ class EasyAI18n:
             translator=translator,
             show_progress=show_progress,
             max_concurrency=max_concurrency,
+            source_locale=self.source_locale,
         )
         await builder.run()
 
@@ -155,6 +160,7 @@ class EasyAI18n:
         """
         return I18n(
             default_locale=default_locale,
+            source_locale=self.source_locale,
             sep=self.sep,
             locales_dir=self.locales_dir,
             func_names=self.func_names,
