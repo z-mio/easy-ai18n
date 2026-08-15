@@ -8,13 +8,13 @@ import ast
 import copy
 import os
 from pathlib import Path
-from typing import Any
 
 import yaml
 from loguru import logger
 
 from ._loader import Loader
 from ._parser import ASTParser, StringData
+from ._types import TextId, TextMap
 from ._utils import generate_id
 from .errors import TranslationError
 from .translators import BaseTranslator, GoogleTranslator
@@ -62,7 +62,7 @@ class Builder:
         self.translator: BaseTranslator = GoogleTranslator() if translator is None else translator
 
         self.project_files = self.load_file()
-        self._locales_dict = Loader(self.locales_dir).load_locales_file(self.to_locales)
+        self._locales = Loader(self.locales_dir).load_locales_file(self.to_locales)
 
     async def run(self) -> None:
         if not self.is_changed():
@@ -88,30 +88,30 @@ class Builder:
         Returns:
             ``True`` if the build completed successfully.
         """
-        updated_locales_dict, to_be_translated = self.compute_changes()
+        locales, to_be_translated = self.compute_changes()
 
         has_failures = False
-        for locale, string_data_list in to_be_translated.items():
+        for locale, entries in to_be_translated.items():
             try:
-                id_to_string_data = {generate_id(string_data.string): string_data for string_data in string_data_list}
-                text_dict = {}
-                for k, string_data in id_to_string_data.items():
-                    if string_data.variables:
-                        text = string_data.string
-                        for i, var in enumerate(string_data.variables.keys()):
+                entry_map = {generate_id(s.string): s for s in entries}
+                texts: TextMap = {}
+                for k, s in entry_map.items():
+                    if s.variables:
+                        text = s.string
+                        for i, var in enumerate(s.variables.keys()):
                             text = text.replace(var, f"{{{{{i}}}}}")
-                        text_dict[k] = text
+                        texts[TextId(k)] = text
                     else:
-                        text_dict[k] = string_data.string
+                        texts[TextId(k)] = s.string
 
-                translated_result = await self.translate(text_dict, locale)
+                translated_result = await self.translate(texts, locale)
 
-                for k, string_data in id_to_string_data.items():
-                    if string_data.variables:
-                        text = translated_result[k]
-                        for i, var in enumerate(string_data.variables.keys()):
+                for k, s in entry_map.items():
+                    if s.variables:
+                        text = translated_result[TextId(k)]
+                        for i, var in enumerate(s.variables.keys()):
                             text = text.replace(f"{{{{{i}}}}}", var)
-                        translated_result[k] = text
+                        translated_result[TextId(k)] = text
             except TranslationError:
                 logger.error(f"Translation to {locale} failed")
                 has_failures = True
@@ -119,45 +119,45 @@ class Builder:
                 logger.exception(f"Unexpected error translating to {locale}:")
                 has_failures = True
             else:
-                updated_locales_dict.setdefault(locale, {})
-                updated_locales_dict[locale] |= translated_result
+                locales.setdefault(locale, {})
+                locales[locale] |= translated_result
 
         if save_to_file:
-            for locale in updated_locales_dict:
-                self.save_to_yaml(updated_locales_dict[locale], locale)
+            for locale in locales:
+                self.save_to_yaml(locales[locale], locale)
         return not has_failures
 
-    def compute_changes(self) -> tuple[dict[str, dict[str, str]], dict[str, list[StringData]]]:
+    def compute_changes(self) -> tuple[dict[str, TextMap], dict[str, list[StringData]]]:
         """Compute changes between source strings and existing translations.
 
         Identifies new strings that need translation and removes
         translations for strings that no longer exist in the source.
 
         Returns:
-            A tuple of ``(updated_locales_dict, to_be_translated)``,
-            where ``updated_locales_dict`` is the cleaned-up
+            A tuple of ``(locales, to_be_translated)``,
+            where ``locales`` is the cleaned-up
             translation dictionary and ``to_be_translated`` maps
             locales to lists of untranslated ``StringData``.
         """
-        id_to_string_data: dict[str, StringData] = {}
+        entries: dict[str, StringData] = {}
         for file in self.project_files:
             for string_data in self.extract_strings(file):
                 if not string_data.string:
                     continue
-                id_to_string_data[generate_id(string_data.string)] = string_data
+                entries[generate_id(string_data.string)] = string_data
 
-        updated_locales_dict = copy.deepcopy(self._locales_dict)
+        locales = copy.deepcopy(self._locales)
         to_be_translated: dict[str, list[StringData]] = {}
         for locale in self.to_locales:
-            if locale not in updated_locales_dict:
-                updated_locales_dict.setdefault(locale, {})
-        for locale in list(self._locales_dict.keys()):
-            if locale not in self.to_locales and locale in updated_locales_dict:
-                del updated_locales_dict[locale]
-        updated_locales_id_dict = self.extract_locale_ids(updated_locales_dict)
-        for trans_id, string_data in id_to_string_data.items():
-            for locale in updated_locales_dict:
-                if trans_id in updated_locales_dict[locale]:
+            if locale not in locales:
+                locales.setdefault(locale, {})
+        for locale in list(self._locales.keys()):
+            if locale not in self.to_locales and locale in locales:
+                del locales[locale]
+        updated_locales_id_dict = self.extract_locale_ids(locales)
+        for trans_id, string_data in entries.items():
+            for locale in locales:
+                if trans_id in locales[locale]:
                     continue
 
                 to_be_translated.setdefault(locale, [])
@@ -166,12 +166,12 @@ class Builder:
 
         for locale in updated_locales_id_dict:
             for trans_id in list(updated_locales_id_dict[locale]):
-                if trans_id in id_to_string_data:
+                if trans_id in entries:
                     continue
-                if trans_id not in updated_locales_dict[locale]:
+                if trans_id not in locales[locale]:
                     continue
-                del updated_locales_dict[locale][trans_id]
-        return updated_locales_dict, to_be_translated
+                del locales[locale][TextId(trans_id)]
+        return locales, to_be_translated
 
     def load_file(self) -> list[Path]:
         project_files: list[Path] = []
@@ -212,20 +212,20 @@ class Builder:
             the existing translation files.
         """
 
-        updated_locale_dict, to_be_translated = self.compute_changes()
-        return bool(updated_locale_dict != self._locales_dict or to_be_translated)
+        locales, to_be_translated = self.compute_changes()
+        return bool(locales != self._locales or to_be_translated)
 
-    async def translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
+    async def translate(self, texts: TextMap, to_locale: str) -> TextMap:
         """Translate texts via the configured translator.
 
         Args:
-            text_id_dict: A dictionary of text IDs to texts.
+            texts: A dictionary of text IDs to texts.
             to_locale: The target language code.
 
         Returns:
             A dictionary of translated texts keyed by ID.
         """
-        return await self.translator.translate_batch(text_id_dict, to_locale)
+        return await self.translator.translate_batch(texts, to_locale)
 
     def extract_strings(self, file: Path) -> list[StringData]:
         """Extract all translatable strings from a Python file.
@@ -245,18 +245,18 @@ class Builder:
             source=source,
         )
 
-    def save_to_yaml(self, locale_dict: dict[str, str], locale: str) -> None:
+    def save_to_yaml(self, texts: TextMap, locale: str) -> None:
         """Save a translation dictionary to a YAML file.
 
         Args:
-            locale_dict: The translation dictionary to save.
+            texts: The translation dictionary to save.
             locale: The locale code, used as the filename.
         """
         with open(self.locales_dir / f"{locale}.yaml", "w", encoding="utf-8") as f:
-            yaml.dump(locale_dict, f, allow_unicode=True)
+            yaml.dump(texts, f, allow_unicode=True)
 
     @staticmethod
-    def extract_locale_ids(locales_dict: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
+    def extract_locale_ids(locales_dict: dict[str, TextMap]) -> dict[str, list[str]]:
         """Extract all translation IDs from a locales dictionary.
 
         Args:
@@ -270,4 +270,4 @@ class Builder:
         if not locales_dict:
             return {}
 
-        return {locale: list(locale_dict) for locale, locale_dict in locales_dict.items()}
+        return {locale: list(texts) for locale, texts in locales_dict.items()}

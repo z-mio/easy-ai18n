@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, overload
 
+from ._types import TextId, TextMap
 from .i18n import I18n, LocaleContent, PostLocaleSelector, PreLocaleSelector
 
 if TYPE_CHECKING:
@@ -15,6 +16,8 @@ __all__ = [
     "PostLocaleSelector",
     "PreLocaleSelector",
     "LocaleContent",
+    "TextId",
+    "TextMap",
 ]
 
 

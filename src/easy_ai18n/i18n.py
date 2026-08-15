@@ -12,6 +12,7 @@ from loguru import logger
 
 from ._loader import Loader
 from ._parser import ASTParser, StringData
+from ._types import TextMap
 from ._utils import generate_id
 from .errors import EvaluationError, FormatError, UnsupportedSyntaxError
 
@@ -72,7 +73,7 @@ class LocaleContent[L](str):
         cls,
         *,
         text: str,
-        locales_dict: dict[str, dict[str, str]],
+        locales: dict[str, TextMap],
         variables: dict[str, object] | None = None,
         locale: str,
         post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
@@ -83,13 +84,13 @@ class LocaleContent[L](str):
         self,
         *,
         text: str,
-        locales_dict: dict[str, dict[str, str]],
+        locales: dict[str, TextMap],
         variables: dict[str, object] | None = None,
         locale: str,
         post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
     ):
         self._text = text
-        self._locales_dict = locales_dict
+        self._locales = locales
         self._variables = variables or {}
         self._locale = locale
         self._post_locale_selector = post_locale_selector or PostLocaleSelector[L]
@@ -125,7 +126,7 @@ class LocaleContent[L](str):
         return str(
             self._post_locale_selector(
                 text=self._text,
-                locales_dict=self._locales_dict,
+                locales=self._locales,
                 variables=self._variables,
                 locale=locale,
             )
@@ -145,7 +146,7 @@ class PostLocaleSelector[L]:
         self,
         *,
         text: str,
-        locales_dict: dict[str, dict[str, str]],
+        locales: dict[str, TextMap],
         variables: dict[str, object] | None = None,
         locale: L | str,
     ):
@@ -153,13 +154,13 @@ class PostLocaleSelector[L]:
 
         Args:
             text: The text to translate.
-            locales_dict: The translation data for all locales.
+            locales: The translation data for all locales.
             variables: A dictionary of f-string variable placeholders
                 and their values.
             locale: The locale identifier.
         """
         self.text = text
-        self.locales_dict = locales_dict
+        self.locales = locales
         self.variables = variables or {}
         self.locale = locale
 
@@ -204,7 +205,7 @@ class PostLocaleSelector[L]:
     def get_by_text(self, text: str, locale: str | None = None) -> str:
         if locale is None:
             return text
-        return self.locales_dict.get(locale, {}).get(generate_id(text), text)
+        return self.locales.get(locale, {}).get(generate_id(text), text)
 
 
 class I18n[L]:
@@ -250,7 +251,7 @@ class I18n[L]:
         self.pre_locale_selector: type[PreLocaleSelector[L]] = pre_locale_selector or PreLocaleSelector[L]
         self.post_locale_selector: type[PostLocaleSelector[L]] = post_locale_selector or PostLocaleSelector[L]
         self.content: type[LocaleContent[L]] = LocaleContent[L]
-        self.locales_dict = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
+        self.locales = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
 
     def t(self, *args: object, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent[L]:
         """Translate text by parsing the caller's AST node.
@@ -275,7 +276,7 @@ class I18n[L]:
         if not f:
             return self.content(
                 text=original,
-                locales_dict=self.locales_dict,
+                locales=self.locales,
                 locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
@@ -290,7 +291,7 @@ class I18n[L]:
         if cache_key in self._parse_failures:
             return self.content(
                 text=original,
-                locales_dict=self.locales_dict,
+                locales=self.locales,
                 locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
@@ -305,7 +306,7 @@ class I18n[L]:
             self._parse_failures.add(cache_key)
             return self.content(
                 text=original,
-                locales_dict=self.locales_dict,
+                locales=self.locales,
                 locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
@@ -314,7 +315,7 @@ class I18n[L]:
             self._parse_failures.add(cache_key)
             return self.content(
                 text=original,
-                locales_dict=self.locales_dict,
+                locales=self.locales,
                 locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
@@ -340,7 +341,7 @@ class I18n[L]:
             logger.error(f"I18N parse error: {original}")
             return self.content(
                 text=original,
-                locales_dict=self.locales_dict,
+                locales=self.locales,
                 locale=self.default_locale,
                 post_locale_selector=self.post_locale_selector,
             )
@@ -348,7 +349,7 @@ class I18n[L]:
         self._cache[cache_key] = result.call_node
         return self.content(
             text=result.string,
-            locales_dict=self.locales_dict,
+            locales=self.locales,
             variables=result.variables,
             locale=self.default_locale,
             post_locale_selector=self.post_locale_selector,

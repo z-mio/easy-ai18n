@@ -3,14 +3,14 @@ import os
 import pytest
 
 from easy_ai18n import EasyAI18n
-from easy_ai18n.translators import BaseItemTranslator
+from easy_ai18n.translators import BaseTranslator
 from easy_ai18n.errors import UnsupportedSyntaxError
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
 
 
-class NoOpTranslator(BaseItemTranslator):
-    async def translate(self, text: str, target_lang: str) -> str:
+class NoOpTranslator(BaseTranslator):
+    async def _translate_one(self, text: str, target_lang: str) -> str:
         return text
 
 

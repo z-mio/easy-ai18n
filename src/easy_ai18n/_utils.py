@@ -1,7 +1,9 @@
 import hashlib
 
+from easy_ai18n import TextId
 
-def generate_id(v: str) -> str:
+
+def generate_id(v: str) -> TextId:
     """Generate a unique 12-character hex ID from the given text.
 
     Args:
@@ -10,4 +12,4 @@ def generate_id(v: str) -> str:
     Returns:
         A 12-character hexadecimal string.
     """
-    return hashlib.md5(v.encode("utf-8")).hexdigest()[:12]
+    return TextId(hashlib.md5(v.encode("utf-8")).hexdigest()[:12])

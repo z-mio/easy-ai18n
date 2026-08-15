@@ -2,12 +2,14 @@ from pathlib import Path
 
 import yaml
 
+from . import TextMap
+
 
 class Loader:
     def __init__(self, locales_dir: Path):
         self.locales_dir = locales_dir
 
-    def load_locales_file(self, locales: list[str] | None = None) -> dict[str, dict]:
+    def load_locales_file(self, locales: list[str] | None = None) -> dict[str, TextMap]:
         """Load YAML translation files from the locales directory.
 
         Args:
@@ -18,7 +20,7 @@ class Loader:
             A dictionary mapping locale codes to their translation
             dictionaries.
         """
-        locales_dict: dict[str, dict] = {}
+        result: dict[str, TextMap] = {}
         yaml_files = list(self.locales_dir.glob("**/*.yaml"))
         if locales:
             yaml_files = [file for file in yaml_files if file.name.split(".")[0] in locales]
@@ -32,6 +34,6 @@ class Loader:
                 continue
 
             locale_code = file.name.split(".")[0]
-            locales_dict[locale_code] = translation_data
+            result[locale_code] = translation_data
 
-        return locales_dict
+        return result

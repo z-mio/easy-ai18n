@@ -9,6 +9,7 @@ import asyncio
 from collections.abc import Callable
 from pprint import pformat
 
+from . import TextId, TextMap
 from .errors import BuildDependencyError, TranslationError
 
 try:
@@ -42,10 +43,10 @@ class BaseTranslator(abc.ABC):
 
     async def translate_batch(
         self,
-        texts: dict[str, str],
+        texts: TextMap,
         target_lang: str,
         on_progress: Callable[[int], None] | None = None,
-    ) -> dict[str, str]:
+    ) -> TextMap:
         """Translate multiple texts concurrently.
 
         The default implementation calls ``_translate_one`` for each
@@ -54,12 +55,12 @@ class BaseTranslator(abc.ABC):
         """
         sem = asyncio.Semaphore(self.max_concurrency)
 
-        async def _do(key: str, text: str) -> tuple[str, str]:
+        async def _do(key: str, text: str) -> tuple[TextId, str]:
             async with sem:
                 result = await self._translate_one(text, target_lang)
                 if on_progress:
                     on_progress(1)
-                return key, result
+                return TextId(key), result
 
         tasks = [_do(k, t) for k, t in texts.items()]
         return dict(await asyncio.gather(*tasks))
@@ -178,12 +179,12 @@ class OpenAIBulkTranslator(BaseTranslator):
 
     async def translate_batch(
         self,
-        texts: dict[str, str],
+        texts: TextMap,
         target_lang: str,
         on_progress: Callable[[int], None] | None = None,
-    ) -> dict[str, str]:
+    ) -> TextMap:
         items = list(texts.items())
-        all_results: dict[str, str] = {}
+        all_results: TextMap = {}
         for i in range(0, len(items), self.batch_size):
             batch = dict(items[i : i + self.batch_size])
             try:
@@ -194,7 +195,7 @@ class OpenAIBulkTranslator(BaseTranslator):
             except Exception as e:
                 raise TranslationError(f"OpenAI translation error: {e}") from e
 
-            batch_results = {item.key: item.value for item in response.output}
+            batch_results = {TextId(item.key): item.value for item in response.output}
             all_results |= batch_results
             if on_progress:
                 on_progress(len(batch_results))
