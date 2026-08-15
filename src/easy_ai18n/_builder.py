@@ -15,7 +15,6 @@ from loguru import logger
 from ._loader import Loader
 from ._parser import ASTParser, StringData
 from ._types import TextId, TextMap
-from ._utils import generate_id
 from .errors import TranslationError
 from .translators import BaseTranslator, GoogleTranslator
 
@@ -93,11 +92,11 @@ class Builder:
         has_failures = False
         for locale, entries in to_be_translated.items():
             try:
-                entry_map = {generate_id(s.string): s for s in entries}
+                entry_map = {s.string.id: s for s in entries}
                 texts: TextMap = {}
                 for k, s in entry_map.items():
                     if s.variables:
-                        text = s.string
+                        text: str = s.string
                         for i, var in enumerate(s.variables.keys()):
                             text = text.replace(var, f"{{{{{i}}}}}")
                         texts[TextId(k)] = text
@@ -139,12 +138,12 @@ class Builder:
             translation dictionary and ``to_be_translated`` maps
             locales to lists of untranslated ``StringData``.
         """
-        entries: dict[str, StringData] = {}
+        entries: dict[TextId, StringData] = {}
         for file in self.project_files:
             for string_data in self.extract_strings(file):
                 if not string_data.string:
                     continue
-                entries[generate_id(string_data.string)] = string_data
+                entries[string_data.string.id] = string_data
 
         locales = copy.deepcopy(self._locales)
         to_be_translated: dict[str, list[StringData]] = {}
@@ -161,16 +160,16 @@ class Builder:
                     continue
 
                 to_be_translated.setdefault(locale, [])
-                if trans_id not in {generate_id(string_data.string) for string_data in to_be_translated[locale]}:
+                if trans_id not in {string_data.string.id for string_data in to_be_translated[locale]}:
                     to_be_translated[locale].append(string_data)
 
         for locale in updated_locales_id_dict:
-            for trans_id in list(updated_locales_id_dict[locale]):
-                if trans_id in entries:
+            for old_id in list(updated_locales_id_dict[locale]):
+                if old_id in entries:
                     continue
-                if trans_id not in locales[locale]:
+                if old_id not in locales[locale]:
                     continue
-                del locales[locale][TextId(trans_id)]
+                del locales[locale][TextId(old_id)]
         return locales, to_be_translated
 
     def load_file(self) -> list[Path]:

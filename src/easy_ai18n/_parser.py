@@ -16,12 +16,13 @@ from pathlib import Path
 from types import FrameType
 from typing import Any
 
+from ._types import Text
 from .errors import EvaluationError, FormatError, UnsupportedSyntaxError
 
 
 @dataclass
 class StringData:
-    string: str
+    string: Text
     variables: dict[str, object]
     call_node: ast.Call
 
@@ -115,7 +116,7 @@ class StringConstructor:
         self,
         call_node: ast.Call,
         evaluator: VariableEvaluator | None = None,
-    ) -> tuple[str, dict[str, object]]:
+    ) -> tuple[Text, dict[str, object]]:
         sep = self.sep
         for kw in call_node.keywords:
             if kw.arg == "sep" and isinstance(kw.value, ast.Constant):
@@ -147,8 +148,8 @@ class StringConstructor:
                 raw_parts.append(part)
                 variables.update(found)
         if r := sep.join(raw_parts):
-            return r, variables
-        return "", {}
+            return Text(r), variables
+        return Text(""), {}
 
     def _parse_f_string(
         self,

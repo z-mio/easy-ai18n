@@ -12,8 +12,7 @@ from loguru import logger
 
 from ._loader import Loader
 from ._parser import ASTParser, StringData
-from ._types import TextMap
-from ._utils import generate_id
+from ._types import Text, TextMap
 from .errors import EvaluationError, FormatError, UnsupportedSyntaxError
 
 if TYPE_CHECKING:
@@ -205,7 +204,7 @@ class PostLocaleSelector[L]:
     def get_by_text(self, text: str, locale: str | None = None) -> str:
         if locale is None:
             return text
-        return self.locales.get(locale, {}).get(generate_id(text), text)
+        return self.locales.get(locale, {}).get(Text.id_of(text), text)
 
 
 class I18n[L]:
@@ -271,7 +270,7 @@ class I18n[L]:
             A ``LocaleContent`` object that supports locale selection.
         """
         sep = sep or self.sep
-        original = sep.join([str(item) for item in args])
+        original = Text(sep.join([str(item) for item in args]))
         f = frame or sys._getframe(1)
         if not f:
             return self.content(
@@ -286,7 +285,7 @@ class I18n[L]:
             f.f_code.co_name,
             f.f_code.co_filename,
         )
-        cache_key = generate_id(str(positions))
+        cache_key = Text.id_of(str(positions))
 
         if cache_key in self._parse_failures:
             return self.content(
