@@ -43,6 +43,7 @@ class EasyAI18n:
     def build(
         self,
         to_locales: str | list[str],
+        *,
         project_root: str | Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
@@ -67,18 +68,19 @@ class EasyAI18n:
         return asyncio.run(
             self.build_async(
                 to_locales,
-                project_root,
-                include,
-                exclude,
-                translator,
-                max_concurrency,
-                show_progress,
+                project_root=project_root,
+                include=include,
+                exclude=exclude,
+                translator=translator,
+                max_concurrency=max_concurrency,
+                show_progress=show_progress,
             )
         )
 
     async def build_async(
         self,
         to_locales: str | list[str],
+        *,
         project_root: str | Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
@@ -119,7 +121,7 @@ class EasyAI18n:
     def i18n(
         self,
         default_locale: str | None = None,
-        enabled_locales: str | list[str] | None = None,
+        *,
         pre_locale_selector: type[PreLocaleSelector] | None = None,
         post_locale_selector: type[PostLocaleSelector] | None = None,
     ) -> I18n:
@@ -127,8 +129,6 @@ class EasyAI18n:
 
         Args:
             default_locale: The default locale code.
-            enabled_locales: The list of enabled language codes.
-                Defaults to all available locales.
             pre_locale_selector: The pre-call locale selector class.
             post_locale_selector: The post-call locale selector class.
 
@@ -137,7 +137,6 @@ class EasyAI18n:
         """
         return I18n(
             default_locale=default_locale,
-            enabled_locales=[enabled_locales] if isinstance(enabled_locales, str) else enabled_locales,
             sep=self.sep,
             locales_dir=self.locales_dir,
             func_names=self.func_names,

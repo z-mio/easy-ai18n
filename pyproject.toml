@@ -11,13 +11,13 @@ authors = [
 dependencies = [
     "loguru>=0.7.3",
     "pyyaml>=6.0.3",
-    "pydantic>=2.13.4",
 ]
 
 [project.optional-dependencies]
-build = [
+builder = [
     "googletrans>=4.0.2",
     "tqdm>=4.67.3",
+    "pydantic>=2.13.4",
     "pydantic-ai-slim[openai]>=2.29.0",
 ]
 

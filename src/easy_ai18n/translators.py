@@ -8,9 +8,13 @@ import abc
 import asyncio
 from pprint import PrettyPrinter
 
-from pydantic import BaseModel, Field
+from .errors import BuildDependencyError, TranslationError
 
-from .errors import TranslationError
+try:
+    from pydantic import BaseModel, Field
+except ImportError as e:
+    raise BuildDependencyError() from e
+
 
 __all__ = [
     "BaseItemTranslator",

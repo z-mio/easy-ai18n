@@ -256,13 +256,13 @@ version = "1.2.0"
 source = { virtual = "." }
 dependencies = [
     { name = "loguru" },
-    { name = "pydantic" },
     { name = "pyyaml" },
 ]
 
 [package.optional-dependencies]
-build = [
+builder = [
     { name = "googletrans" },
+    { name = "pydantic" },
     { name = "pydantic-ai-slim", extra = ["openai"] },
     { name = "tqdm" },
 ]
@@ -276,14 +276,14 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "googletrans", marker = "extra == 'build'", specifier = ">=4.0.2" },
+    { name = "googletrans", marker = "extra == 'builder'", specifier = ">=4.0.2" },
     { name = "loguru", specifier = ">=0.7.3" },
-    { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'build'", specifier = ">=2.29.0" },
+    { name = "pydantic", marker = "extra == 'builder'", specifier = ">=2.13.4" },
+    { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'builder'", specifier = ">=2.29.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "tqdm", marker = "extra == 'build'", specifier = ">=4.67.3" },
+    { name = "tqdm", marker = "extra == 'builder'", specifier = ">=4.67.3" },
 ]
-provides-extras = ["build"]
+provides-extras = ["builder"]
 
 [package.metadata.requires-dev]
 dev = [
