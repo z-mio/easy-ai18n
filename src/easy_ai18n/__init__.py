@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, overload
 from .i18n import I18n, LocaleContent, PostLocaleSelector, PreLocaleSelector
 
 if TYPE_CHECKING:
-    from .translators import BaseBulkTranslator, BaseItemTranslator
+    from .translators import BaseTranslator
 
 __all__ = [
     "EasyAI18n",
@@ -52,8 +52,7 @@ class EasyAI18n:
         project_root: str | Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
-        translator: BaseItemTranslator | BaseBulkTranslator | None = None,
-        max_concurrency: int | None = None,
+        translator: BaseTranslator | None = None,
     ) -> None:
         """Build translation files (synchronous wrapper).
 
@@ -64,8 +63,6 @@ class EasyAI18n:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
-            max_concurrency: The maximum number of concurrent
-                translation tasks.
         """
         return asyncio.run(
             self.build_async(
@@ -74,7 +71,6 @@ class EasyAI18n:
                 include=include,
                 exclude=exclude,
                 translator=translator,
-                max_concurrency=max_concurrency,
             )
         )
 
@@ -85,8 +81,7 @@ class EasyAI18n:
         project_root: str | Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
-        translator: BaseItemTranslator | BaseBulkTranslator | None = None,
-        max_concurrency: int | None = None,
+        translator: BaseTranslator | None = None,
     ) -> None:
         """Build translation files asynchronously.
 
@@ -97,10 +92,6 @@ class EasyAI18n:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
-            max_concurrency: The maximum number of concurrent
-                translation tasks.
-            show_progress: Whether to show the translation progress
-                bar.
         """
         from ._builder import Builder
 
@@ -113,7 +104,6 @@ class EasyAI18n:
             include=include,
             exclude=exclude,
             translator=translator,
-            max_concurrency=max_concurrency,
             source_locale=self.source_locale,
         )
         await builder.run()

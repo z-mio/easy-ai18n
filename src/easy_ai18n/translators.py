@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+from collections.abc import Callable
 from pprint import pformat
 
 from .errors import BuildDependencyError, TranslationError
@@ -17,33 +18,51 @@ except ImportError as e:
 
 
 __all__ = [
-    "BaseItemTranslator",
-    "BaseBulkTranslator",
+    "BaseTranslator",
     "GoogleTranslator",
     "OpenAIItemTranslator",
     "TranslatorResult",
     "OpenAIBulkTranslator",
 ]
 
-# ── ABCs ────────────────────────────────────────────────────────
+
+# ── ABC ──────────────────────────────────────────────────────────
 
 
-class BaseItemTranslator(abc.ABC):
-    """Translator that processes one item at a time."""
+class BaseTranslator(abc.ABC):
+    """Abstract translator with optional progress reporting."""
 
-    @abc.abstractmethod
-    async def translate(self, text: str, target_lang: str) -> str:
-        """Translate the given text to the target language."""
-        raise NotImplementedError()
-
-
-class BaseBulkTranslator(abc.ABC):
-    """Translator that processes multiple items at once via LLM."""
+    def __init__(self, max_concurrency: int = 10) -> None:
+        self.max_concurrency = max_concurrency
 
     @abc.abstractmethod
-    async def translate(self, text_id_dict: dict, target_lang: str) -> dict:
-        """Translate multiple texts to the target language."""
+    async def _translate_one(self, text: str, target_lang: str) -> str:
+        """Translate a single text string."""
         raise NotImplementedError()
+
+    async def translate_batch(
+        self,
+        texts: dict[str, str],
+        target_lang: str,
+        on_progress: Callable[[int], None] | None = None,
+    ) -> dict[str, str]:
+        """Translate multiple texts concurrently.
+
+        The default implementation calls ``_translate_one`` for each
+        item with a semaphore for concurrency control.  Bulk translators
+        should override this to send a single API request.
+        """
+        sem = asyncio.Semaphore(self.max_concurrency)
+
+        async def _do(key: str, text: str) -> tuple[str, str]:
+            async with sem:
+                result = await self._translate_one(text, target_lang)
+                if on_progress:
+                    on_progress(1)
+                return key, result
+
+        tasks = [_do(k, t) for k, t in texts.items()]
+        return dict(await asyncio.gather(*tasks))
 
 
 # ── Shared constants ─────────────────────────────────────────────
@@ -65,10 +84,10 @@ Don't add anything extra, and don't modify python variables inside the text
 # ── Google Translate ────────────────────────────────────────────
 
 
-class GoogleTranslator(BaseItemTranslator):
+class GoogleTranslator(BaseTranslator):
     """Google Translate translator."""
 
-    async def translate(self, text: str, target_lang: str) -> str:
+    async def _translate_one(self, text: str, target_lang: str) -> str:
         from googletrans import Translator
 
         last_exc: Exception | None = None
@@ -86,8 +105,8 @@ class GoogleTranslator(BaseItemTranslator):
 # ── OpenAI ──────────────────────────────────────────────────────
 
 
-class OpenAIItemTranslator(BaseItemTranslator):
-    """OpenAI translator — translates items one by one."""
+class OpenAIItemTranslator(BaseTranslator):
+    """OpenAI translator — translates items one by one (with concurrency)."""
 
     def __init__(
         self,
@@ -95,7 +114,9 @@ class OpenAIItemTranslator(BaseItemTranslator):
         base_url: str | None = None,
         model: str = "gpt-5-mini",
         prompt: str = TRANSLATE_PROMPT,
-    ):
+        max_concurrency: int = 10,
+    ) -> None:
+        super().__init__(max_concurrency=max_concurrency)
         from pydantic_ai import Agent
         from pydantic_ai.models.openai import OpenAIChatModel
         from pydantic_ai.providers.openai import OpenAIProvider
@@ -111,11 +132,11 @@ class OpenAIItemTranslator(BaseItemTranslator):
             retries=3,
         )
 
-    async def translate(self, text: str, target_lang: str) -> str:
+    async def _translate_one(self, text: str, target_lang: str) -> str:
         result = await self._agent.run(
             f"Translate the text to {target_lang}:\n{text}",
         )
-        return result.output
+        return str(result.output)
 
 
 class TranslatorResult(BaseModel):
@@ -123,8 +144,8 @@ class TranslatorResult(BaseModel):
     value: str = Field(..., description="value")
 
 
-class OpenAIBulkTranslator(BaseBulkTranslator):
-    """OpenAI translator — translates multiple items in bulk."""
+class OpenAIBulkTranslator(BaseTranslator):
+    """OpenAI translator — translates multiple items in one API call."""
 
     def __init__(
         self,
@@ -132,7 +153,9 @@ class OpenAIBulkTranslator(BaseBulkTranslator):
         base_url: str | None = None,
         model: str = "gpt-5-mini",
         prompt: str = TRANSLATE_PROMPT,
-    ):
+        batch_size: int = 50,
+    ) -> None:
+        super().__init__(max_concurrency=1)
         from pydantic_ai import Agent
         from pydantic_ai.models.openai import OpenAIChatModel
         from pydantic_ai.providers.openai import OpenAIProvider
@@ -148,14 +171,31 @@ class OpenAIBulkTranslator(BaseBulkTranslator):
             model_settings=ModelSettings(temperature=0, thinking=False),
             retries=3,
         )
+        self.batch_size = batch_size
 
-    async def translate(self, text_id_dict: dict, target_lang: str) -> dict:
-        try:
-            text = pformat(text_id_dict)
-            response = await self._agent.run(
-                f"Translate the text to {target_lang}:\n{text}",
-            )
-        except Exception as e:
-            raise TranslationError(f"OpenAI translation error: {e}") from e
+    async def _translate_one(self, text: str, target_lang: str) -> str:
+        raise NotImplementedError("OpenAIBulkTranslator does not support single-item translation")
 
-        return {item.key: item.value for item in response.output}
+    async def translate_batch(
+        self,
+        texts: dict[str, str],
+        target_lang: str,
+        on_progress: Callable[[int], None] | None = None,
+    ) -> dict[str, str]:
+        items = list(texts.items())
+        all_results: dict[str, str] = {}
+        for i in range(0, len(items), self.batch_size):
+            batch = dict(items[i : i + self.batch_size])
+            try:
+                text = pformat(batch)
+                response = await self._agent.run(
+                    f"Translate the text to {target_lang}:\n{text}",
+                )
+            except Exception as e:
+                raise TranslationError(f"OpenAI translation error: {e}") from e
+
+            batch_results = {item.key: item.value for item in response.output}
+            all_results |= batch_results
+            if on_progress:
+                on_progress(len(batch_results))
+        return all_results

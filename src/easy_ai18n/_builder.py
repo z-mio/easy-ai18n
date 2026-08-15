@@ -5,7 +5,6 @@ Translation dictionary builder.
 from __future__ import annotations
 
 import ast
-import asyncio
 import copy
 import os
 from pathlib import Path
@@ -17,8 +16,8 @@ from loguru import logger
 from ._loader import Loader
 from ._parser import ASTParser, StringData
 from ._utils import generate_id
-from .errors import BuildError, TranslationError
-from .translators import BaseBulkTranslator, BaseItemTranslator, GoogleTranslator
+from .errors import TranslationError
+from .translators import BaseTranslator, GoogleTranslator
 
 
 class Builder:
@@ -33,8 +32,7 @@ class Builder:
         project_root: Path | None = None,
         include: list[str] | None = None,
         exclude: list[str] | None = None,
-        translator: BaseItemTranslator | BaseBulkTranslator | None = None,
-        max_concurrency: int | None = None,
+        translator: BaseTranslator | None = None,
     ):
         """Set up the translation build pipeline.
 
@@ -51,8 +49,6 @@ class Builder:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
-            max_concurrency: The maximum number of concurrent
-                translation tasks.
         """
         self.project_root = project_root or Path(os.getcwd())
         self.include = include or []
@@ -63,16 +59,9 @@ class Builder:
         self.to_locales = [i.lower() for i in to_locales]
         self.locales_dir = locales_dir
         self.source_locale = source_locale
-        self.translator: BaseItemTranslator | BaseBulkTranslator = (
-            translator if translator is not None else GoogleTranslator()
-        )
+        self.translator: BaseTranslator = GoogleTranslator() if translator is None else translator
 
         self.project_files = self.load_file()
-        self.max_concurrency = (
-            max_concurrency
-            if max_concurrency is not None
-            else (30 if isinstance(self.translator, BaseItemTranslator) else 50)
-        )
         self._locales_dict = Loader(self.locales_dir).load_locales_file(self.to_locales)
 
     async def run(self) -> None:
@@ -143,9 +132,6 @@ class Builder:
 
         Identifies new strings that need translation and removes
         translations for strings that no longer exist in the source.
-
-        Args:
-            verbose: Whether to log change details at debug level.
 
         Returns:
             A tuple of ``(updated_locales_dict, to_be_translated)``,
@@ -229,75 +215,17 @@ class Builder:
         updated_locale_dict, to_be_translated = self.compute_changes()
         return bool(updated_locale_dict != self._locales_dict or to_be_translated)
 
-    async def translate_items(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
-        """Translate texts one by one.
-
-        Args:
-            text_id_dict: A dictionary of text IDs to texts.
-            to_locale: The target language code.
-
-        Returns:
-            A dictionary of translated texts keyed by ID.
-        """
-        result: dict[str, str] = {}
-
-        semaphore = asyncio.Semaphore(self.max_concurrency)
-        translator = self.translator
-        if not isinstance(translator, BaseItemTranslator):
-            raise BuildError("translate_items requires a BaseItemTranslator")
-
-        async def _translate_one(text: str, locale: str, sem: asyncio.Semaphore) -> str:
-            async with sem:
-                return await translator.translate(text, locale)
-
-        tasks: dict[str, asyncio.Task] = {
-            key: asyncio.create_task(_translate_one(text, to_locale, semaphore)) for key, text in text_id_dict.items()
-        }
-
-        done, pending = await asyncio.wait(tasks.values(), timeout=300)
-        for task in pending:
-            task.cancel()
-
-        for key, task in tasks.items():
-            try:
-                translated_text = task.result()
-            except TranslationError:
-                logger.error(f"→ [{to_locale}] Translation failed (id={key}, text={text_id_dict[key]})")
-            except Exception:
-                logger.exception(f"→ [{to_locale}] Unexpected error (id={key}):")
-            else:
-                result[key] = translated_text
-
-        return result
-
-    async def translate_bulk(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
-        """Translate texts in bulk.
-
-        Args:
-            text_id_dict: A dictionary of text IDs to texts.
-            to_locale: The target language code.
-
-        Returns:
-            A dictionary of translated texts keyed by ID.
-        """
-        translator = self.translator
-        if not isinstance(translator, BaseBulkTranslator):
-            raise BuildError("translate_bulk requires a BaseBulkTranslator")
-        items = list(text_id_dict.items())
-        all_results: dict[str, str] = {}
-        for i in range(0, len(items), self.max_concurrency):
-            batch = dict(items[i : i + self.max_concurrency])
-            batch_results = await translator.translate(batch, to_locale)
-            all_results |= batch_results
-        return all_results
-
     async def translate(self, text_id_dict: dict[str, str], to_locale: str) -> dict[str, str]:
-        if isinstance(self.translator, BaseItemTranslator):
-            return await self.translate_items(text_id_dict, to_locale)
-        elif isinstance(self.translator, BaseBulkTranslator):
-            return await self.translate_bulk(text_id_dict, to_locale)
-        else:
-            raise BuildError(f"Unsupported translator type: {type(self.translator).__name__}")
+        """Translate texts via the configured translator.
+
+        Args:
+            text_id_dict: A dictionary of text IDs to texts.
+            to_locale: The target language code.
+
+        Returns:
+            A dictionary of translated texts keyed by ID.
+        """
+        return await self.translator.translate_batch(text_id_dict, to_locale)
 
     def extract_strings(self, file: Path) -> list[StringData]:
         """Extract all translatable strings from a Python file.
