@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
-from pprint import PrettyPrinter
+from pprint import pformat
 
 from .errors import BuildDependencyError, TranslationError
 
@@ -69,12 +69,12 @@ class GoogleTranslator(BaseItemTranslator):
     """Google Translate translator."""
 
     async def translate(self, text: str, target_lang: str) -> str:
-        from googletrans import Translator as GoogleTranslatorLib
+        from googletrans import Translator
 
         last_exc: Exception | None = None
         for _ in range(3):
             try:
-                result = await GoogleTranslatorLib().translate(text, dest=target_lang)
+                result = await Translator().translate(text, dest=target_lang)
             except Exception as e:
                 last_exc = e
                 await asyncio.sleep(1.5)
@@ -151,7 +151,7 @@ class OpenAIBulkTranslator(BaseBulkTranslator):
 
     async def translate(self, text_id_dict: dict, target_lang: str) -> dict:
         try:
-            text = PrettyPrinter().pformat(text_id_dict)
+            text = pformat(text_id_dict)
             response = await self._agent.run(
                 f"Translate the text to {target_lang}:\n{text}",
             )
