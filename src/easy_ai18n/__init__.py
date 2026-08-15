@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 from .i18n import I18n, LocaleContent, PostLocaleSelector, PreLocaleSelector
 
@@ -118,13 +118,31 @@ class EasyAI18n:
         )
         await builder.run()
 
+    @overload
     def i18n(
         self,
         default_locale: str | None = None,
         *,
-        pre_locale_selector: type[PreLocaleSelector] | None = None,
-        post_locale_selector: type[PostLocaleSelector] | None = None,
-    ) -> I18n:
+        pre_locale_selector: None = None,
+        post_locale_selector: None = None,
+    ) -> I18n[str | None]: ...
+
+    @overload
+    def i18n[L](
+        self,
+        default_locale: str | None = None,
+        *,
+        pre_locale_selector: type[PreLocaleSelector[L]] | None = None,
+        post_locale_selector: type[PostLocaleSelector[L]],
+    ) -> I18n[L]: ...
+
+    def i18n[L](
+        self,
+        default_locale: str | None = None,
+        *,
+        pre_locale_selector: type[PreLocaleSelector[L]] | None = None,
+        post_locale_selector: type[PostLocaleSelector[L]] | None = None,
+    ) -> I18n[L]:
         """Create an ``I18n`` instance for translation.
 
         Args:

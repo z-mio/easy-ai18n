@@ -26,16 +26,16 @@ __all__ = [
 ]
 
 
-class PreLocaleSelector:
+class PreLocaleSelector[L]:
     """Pre-call language selector.
 
     Used via ``_[locale]("text")`` syntax.
     """
 
-    def __init__(self, *, i18n: "I18n", sep: str, locale: str | None = None):
+    def __init__(self, *, i18n: "I18n[L]", sep: str, locale: L):
         self.i18n = i18n
         self.sep = sep
-        self.locale = locale
+        self.locale: L = locale
 
     def __str__(self) -> str:
         return ""
@@ -61,7 +61,7 @@ class PreLocaleSelector:
         return self.i18n.t(*args, sep=sep or self.sep, frame=frame)[self.locale]
 
 
-class LocaleContent(str):
+class LocaleContent[L](str):
     """Translated content with multi-locale access.
 
     Behaves like a string in the default locale and supports locale
@@ -75,7 +75,7 @@ class LocaleContent(str):
         locales_dict: dict[str, dict[str, str]],
         variables: dict[str, object] | None = None,
         locale: str | None = None,
-        post_locale_selector: type["PostLocaleSelector"] | None = None,
+        post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
     ) -> Self:
         return str.__new__(cls, text)
 
@@ -86,13 +86,13 @@ class LocaleContent(str):
         locales_dict: dict[str, dict[str, str]],
         variables: dict[str, object] | None = None,
         locale: str | None = None,
-        post_locale_selector: type["PostLocaleSelector"] | None = None,
+        post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
     ):
         self._text = text
         self._locales_dict = locales_dict
         self._variables = variables or {}
         self._locale = locale
-        self._post_locale_selector = post_locale_selector or PostLocaleSelector
+        self._post_locale_selector = post_locale_selector or PostLocaleSelector[L]
 
     def __str__(self) -> str:
         return self.__call__(self._locale)
@@ -100,11 +100,11 @@ class LocaleContent(str):
     def __repr__(self) -> str:
         return self.__call__(self._locale)
 
-    def __getitem__(self, locale: SupportsIndex | slice | str | None) -> str:
+    def __getitem__(self, locale: SupportsIndex | slice | L) -> str:
         """Select a locale via ``_[locale]`` syntax.
 
         Args:
-            locale: The locale code to retrieve.
+            locale: The locale identifier to retrieve.
 
         Returns:
             The translated string for the given locale.
@@ -113,11 +113,11 @@ class LocaleContent(str):
             return super().__getitem__(locale)
         return self.__call__(locale)
 
-    def __call__(self, locale: str | None) -> str:
+    def __call__(self, locale: L | str | None) -> str:
         """Select a locale via ``_(locale)`` syntax.
 
         Args:
-            locale: The locale code to retrieve.
+            locale: The locale identifier to retrieve.
 
         Returns:
             The translated string for the given locale.
@@ -135,7 +135,7 @@ class LocaleContent(str):
         return int(self.__str__())
 
 
-class PostLocaleSelector:
+class PostLocaleSelector[L]:
     """Post-call language selector.
 
     Used via ``_("text")[locale]`` or ``_("text")(locale)`` syntax.
@@ -147,7 +147,7 @@ class PostLocaleSelector:
         text: str,
         locales_dict: dict[str, dict[str, str]],
         variables: dict[str, object] | None = None,
-        locale: str | None = None,
+        locale: L | str | None = None,
     ):
         """Initialize PostLocaleSelector.
 
@@ -156,7 +156,7 @@ class PostLocaleSelector:
             locales_dict: The translation data for all locales.
             variables: A dictionary of f-string variable placeholders
                 and their values.
-            locale: The default locale code.
+            locale: The locale identifier.
         """
         self.text = text
         self.locales_dict = locales_dict
@@ -169,29 +169,29 @@ class PostLocaleSelector:
     def __repr__(self) -> str:
         return self.__getitem__(self.locale)
 
-    def __getitem__(self, locale: str | None) -> str:
+    def __getitem__(self, locale: L | str | None) -> str:
         """Select a locale via ``[locale]`` syntax.
 
         Args:
-            locale: The locale code to retrieve.
+            locale: The locale identifier to retrieve.
 
         Returns:
             The translated string.
         """
         return self.format(locale)
 
-    def format(self, locale: str | None = None) -> str:
+    def format(self, locale: L | str | None = None) -> str:
         """Format the string and apply translation.
 
         Args:
-            locale: The locale code to translate to. If ``None``,
-                the original text is returned with variables
-                substituted.
+            locale: The locale code to translate to. If ``None`` or
+                not a string, the original text is returned with
+                variables substituted.
 
         Returns:
             The formatted and translated string.
         """
-        if not locale:
+        if not isinstance(locale, str) or not locale:
             return self._format(self.text)
         translated = self.get_by_text(self.text, locale)
         return self._format(translated)
@@ -207,7 +207,7 @@ class PostLocaleSelector:
         return self.locales_dict.get(locale, {}).get(generate_id(text), text)
 
 
-class I18n:
+class I18n[L]:
     def __init__(
         self,
         sep: str,
@@ -215,8 +215,8 @@ class I18n:
         func_names: list[str],
         enabled_locales: list[str] | None = None,
         default_locale: str | None = None,
-        pre_locale_selector: type[PreLocaleSelector] | None = None,
-        post_locale_selector: type[PostLocaleSelector] | None = None,
+        pre_locale_selector: type[PreLocaleSelector[L]] | None = None,
+        post_locale_selector: type[PostLocaleSelector[L]] | None = None,
     ) -> None:
         """Initialize I18n.
 
@@ -240,12 +240,12 @@ class I18n:
         self.sep = sep
         self.locales_dir = locales_dir
         self.func_names = func_names
-        self.pre_locale_selector = pre_locale_selector or PreLocaleSelector
-        self.post_locale_selector = post_locale_selector or PostLocaleSelector
-        self.content = LocaleContent
+        self.pre_locale_selector: type[PreLocaleSelector[L]] = pre_locale_selector or PreLocaleSelector[L]
+        self.post_locale_selector: type[PostLocaleSelector[L]] = post_locale_selector or PostLocaleSelector[L]
+        self.content: type[LocaleContent[L]] = LocaleContent[L]
         self.locales_dict = Loader(self.locales_dir).load_locales_file(self.enabled_locales)
 
-    def t(self, *args: object, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent:
+    def t(self, *args: object, sep: str | None = None, frame: FrameType | None = None) -> LocaleContent[L]:
         """Translate text by parsing the caller's AST node.
 
         This is the core translation entry point. It extracts the
@@ -279,7 +279,6 @@ class I18n:
         )
         cache_key = generate_id(str(positions))
 
-        # 解析错误的内容直接返回原文
         if cache_key in self._parse_failures:
             return self.content(
                 text=original,
@@ -287,7 +286,6 @@ class I18n:
                 post_locale_selector=self.post_locale_selector,
             )
 
-        # 获取缓存的节点
         call_node = self._cache.get(cache_key, None)
 
         try:
@@ -310,7 +308,7 @@ class I18n:
                 post_locale_selector=self.post_locale_selector,
             )
 
-    def _handle_cache(self, original: str, cache_key: str, result: StringData | None) -> LocaleContent:
+    def _handle_cache(self, original: str, cache_key: str, result: StringData | None) -> LocaleContent[L]:
         """Handle the cache entry and return the result.
 
         If parsing succeeded, the AST node is cached; otherwise the
@@ -349,11 +347,11 @@ class I18n:
         self._cache.clear()
         self._parse_failures.clear()
 
-    def __getitem__(self, locale: str) -> PreLocaleSelector:
+    def __getitem__(self, locale: L) -> PreLocaleSelector[L]:
         """Select a locale via ``I18n[locale]`` syntax.
 
         Args:
-            locale: The locale code to select.
+            locale: The locale identifier to select.
 
         Returns:
             A ``PreLocaleSelector`` that translates all subsequent
@@ -361,7 +359,7 @@ class I18n:
         """
         return self.pre_locale_selector(i18n=self, locale=locale, sep=self.sep)
 
-    def __call__(self, *args: object, sep: str | None = None) -> LocaleContent:
+    def __call__(self, *args: object, sep: str | None = None) -> LocaleContent[L]:
         """Translate text by calling ``I18n(...)``.
 
         Args:
