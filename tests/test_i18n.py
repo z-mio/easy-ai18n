@@ -15,7 +15,7 @@ class NoOpTranslator(BaseItemTranslator):
 
 
 def test_build(tmp_path):
-    i18n = EasyAI18n(locales_dir=tmp_path)
+    i18n = EasyAI18n("zh-hans", locales_dir=tmp_path)
     i18n.build(
         project_root="tests",
         to_locales=["en", "ja"],
@@ -34,7 +34,7 @@ def test_build_rejects_await_in_f_string(tmp_path):
         encoding="utf-8",
     )
 
-    i18n = EasyAI18n(locales_dir=tmp_path / "locales")
+    i18n = EasyAI18n("zh-hans", locales_dir=tmp_path / "locales")
     with pytest.raises(UnsupportedSyntaxError, match="await not allowed inside f-string") as exc_info:
         i18n.build(
             project_root=tmp_path,
@@ -56,7 +56,7 @@ def test_build_allows_await_before_f_string(tmp_path):
         encoding="utf-8",
     )
 
-    i18n = EasyAI18n(locales_dir=tmp_path / "locales")
+    i18n = EasyAI18n("zh-hans", locales_dir=tmp_path / "locales")
     i18n.build(
         project_root=tmp_path,
         to_locales=["en"],
@@ -69,7 +69,7 @@ def test_build_allows_await_before_f_string(tmp_path):
 
 
 def test_basic():
-    i18n = EasyAI18n(locales_dir="tests/i18n")
+    i18n = EasyAI18n("zh-hans", locales_dir="tests/i18n")
     _ = i18n.i18n()
 
     # 普通测试
