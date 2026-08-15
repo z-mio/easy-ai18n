@@ -228,7 +228,7 @@ class I18n[L]:
             func_names: The names of translation functions to
                 recognize during AST parsing.
             source_locale: The source language of the translatable
-                strings (e.g. ``"zh-Hans"``).
+                strings (e.g. ``"zh-hans"``).
             enabled_locales: The list of enabled language codes.
             default_locale: The default locale code. Defaults to
                 ``source_locale``.

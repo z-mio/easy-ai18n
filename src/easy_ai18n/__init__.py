@@ -22,6 +22,7 @@ class EasyAI18n:
     def __init__(
         self,
         source_locale: str,
+        *,
         func_names: str | list[str] | None = None,
         sep: str | None = None,
         locales_dir: str | Path | None = None,
@@ -30,7 +31,7 @@ class EasyAI18n:
 
         Args:
             source_locale: The source language of the translatable
-                strings (e.g. ``"zh-Hans"``).
+                strings (e.g. ``"zh-hans"``).
             func_names: The names of translation functions to
                 recognize (defaults to ``["_"]``).
             sep: The separator between text parts (defaults to
