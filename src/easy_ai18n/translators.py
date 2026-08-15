@@ -14,8 +14,8 @@ from .errors import BuildDependencyError, TranslationError
 
 try:
     from pydantic import BaseModel, Field
-except ImportError as e:
-    raise BuildDependencyError() from e
+except ImportError as _import_error:
+    raise BuildDependencyError() from _import_error
 
 
 __all__ = [
