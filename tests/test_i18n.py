@@ -3,15 +3,15 @@ import os
 import pytest
 
 from easy_ai18n import EasyAI18n
-from easy_ai18n.translators import BaseTranslator
 from easy_ai18n.errors import UnsupportedSyntaxError
+from easy_ai18n.translators import BaseTranslator
 
 os.putenv("I18N_LOG_LEVEL", "DEBUG")
 
 
 class NoOpTranslator(BaseTranslator):
     async def _translate_one(self, text: str, target_lang: str) -> str:
-        return text
+        return str(text)
 
 
 def test_build(tmp_path):
@@ -24,6 +24,11 @@ def test_build(tmp_path):
     )
     assert i18n.locales_dir.joinpath("en.yaml").exists()
     assert i18n.locales_dir.joinpath("ja.yaml").exists()
+
+    from easy_ai18n._loader import Loader
+
+    loaded = Loader(tmp_path).load_locales_file(["en", "ja"])
+    assert loaded["en"] and loaded["ja"]
 
 
 def test_build_rejects_await_in_f_string(tmp_path):
