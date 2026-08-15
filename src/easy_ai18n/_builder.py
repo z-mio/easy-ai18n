@@ -40,15 +40,17 @@ class Builder:
         show_progress: bool = True,
         max_concurrency: int | None = None,
     ):
-        """Initialize Builder.
+        """Set up the translation build pipeline.
 
         Args:
-            to_locales: The target language codes to translate to.
             sep: The separator between text parts.
             func_names: The names of translation functions to
                 recognize during AST parsing.
-            project_root: The project root directory.
             locales_dir: The directory for YAML translation files.
+            to_locales: The target language codes to translate to.
+            source_locale: The source language of the translatable
+                strings.
+            project_root: The project root directory.
             include: File or directory patterns to include.
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
@@ -57,8 +59,6 @@ class Builder:
                 bar.
             max_concurrency: The maximum number of concurrent
                 translation tasks.
-            source_locale: The source language of the translatable
-                strings.
         """
         self.project_root = project_root or Path(os.getcwd())
         self.include = include or []

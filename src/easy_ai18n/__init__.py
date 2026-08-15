@@ -26,7 +26,7 @@ class EasyAI18n:
         sep: str | None = None,
         locales_dir: str | Path | None = None,
     ):
-        """Initialize EasyAI18n.
+        """Set up the i18n environment.
 
         Args:
             source_locale: The source language of the translatable
@@ -151,7 +151,8 @@ class EasyAI18n:
         """Create an ``I18n`` instance for translation.
 
         Args:
-            default_locale: The default locale code.
+            default_locale: The default locale code. Defaults to
+                the ``source_locale`` set on ``EasyAI18n``.
             pre_locale_selector: The pre-call locale selector class.
             post_locale_selector: The post-call locale selector class.
 

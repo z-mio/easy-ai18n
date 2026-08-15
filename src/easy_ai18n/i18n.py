@@ -74,7 +74,7 @@ class LocaleContent[L](str):
         text: str,
         locales_dict: dict[str, dict[str, str]],
         variables: dict[str, object] | None = None,
-        locale: str | None = None,
+        locale: str,
         post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
     ) -> Self:
         return str.__new__(cls, text)
@@ -149,7 +149,7 @@ class PostLocaleSelector[L]:
         variables: dict[str, object] | None = None,
         locale: L | str,
     ):
-        """Initialize PostLocaleSelector.
+        """Set up the post-call selector with translation data.
 
         Args:
             text: The text to translate.
@@ -220,17 +220,18 @@ class I18n[L]:
         pre_locale_selector: type[PreLocaleSelector[L]] | None = None,
         post_locale_selector: type[PostLocaleSelector[L]] | None = None,
     ) -> None:
-        """Initialize I18n.
+        """Set up the translation runtime.
 
         Args:
+            sep: The separator between text parts.
+            locales_dir: The directory for YAML translation files.
+            func_names: The names of translation functions to
+                recognize during AST parsing.
             source_locale: The source language of the translatable
                 strings (e.g. ``"zh-Hans"``).
             enabled_locales: The list of enabled language codes.
             default_locale: The default locale code. Defaults to
                 ``source_locale``.
-            sep: The separator between text parts.
-            func_names: The names of translation functions to
-                recognize during AST parsing.
             pre_locale_selector: The pre-call locale selector class.
             post_locale_selector: The post-call locale selector class.
         """
