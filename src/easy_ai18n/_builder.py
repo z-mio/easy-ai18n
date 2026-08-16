@@ -224,7 +224,7 @@ class Builder:
         Returns:
             A dictionary of translated texts keyed by ID.
         """
-        return await self.translator.translate_batch(texts, to_locale)
+        return await self.translator.translate(texts, to_locale)
 
     def extract_strings(self, file: Path) -> list[StringData]:
         """Extract all translatable strings from a Python file.
