@@ -42,6 +42,15 @@ class BaseTranslator(abc.ABC):
     """
 
     def __init__(self, *, batch_size: int = 1, max_concurrency: int = 10) -> None:
+        """Set up the translator.
+
+        Args:
+            batch_size: The number of texts translated per chunk.
+                ``1`` means one API call per text, ``>1`` means one
+                API call per chunk of this size.
+            max_concurrency: The maximum number of chunks running
+                concurrently.
+        """
         self.batch_size = batch_size
         self.max_concurrency = max_concurrency
 
