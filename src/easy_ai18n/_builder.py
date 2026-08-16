@@ -111,7 +111,9 @@ class Builder:
             locales_dir: The directory for YAML translation files.
             to_locales: The target language codes to translate to.
             source_locale: The source language of the translatable
-                strings.
+                strings. Passed to the translator on every translation
+                call as the source-language hint, and warned about when
+                it also appears in ``to_locales``.
             project_root: The project root directory. Defaults to the
                 current working directory.
             include: File or directory patterns to include. A path is
@@ -138,7 +140,12 @@ class Builder:
         self.func_names = func_names
         self.sep = sep
         self.to_locales = [i.lower() for i in to_locales]
-        self.source_locale = source_locale
+        self.source_locale = source_locale.lower()
+        if self.source_locale in self.to_locales:
+            logger.warning(
+                f"to_locales contains the source locale {self.source_locale!r}: "
+                "translating into it would produce a copy of the source text"
+            )
         self.translator: BaseTranslator = GoogleTranslator() if translator is None else translator
         self.show_progress = show_progress
         self.concurrent_locales = concurrent_locales
@@ -303,8 +310,9 @@ class Builder:
         """Mask variables, translate, then restore them."""
         texts: TextMap = {entry.id: _mask(entry.text, entry.placeholders) for entry in entries}
         translated = await self.translator.translate(
-            texts,
-            locale,
+            texts=texts,
+            target_lang=locale,
+            source_lang=self.source_locale,
             on_progress=lambda n: handle.advance(locale, n),
         )
         for entry in entries:

@@ -75,6 +75,7 @@ class LocaleContent[L](str):
         locales: dict[str, TextMap],
         variables: dict[str, object] | None = None,
         locale: str,
+        source_locale: str | None = None,
         post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
     ) -> Self:
         return str.__new__(cls, text)
@@ -86,12 +87,14 @@ class LocaleContent[L](str):
         locales: dict[str, TextMap],
         variables: dict[str, object] | None = None,
         locale: str,
+        source_locale: str | None = None,
         post_locale_selector: "type[PostLocaleSelector[L]] | None" = None,
     ):
         self._text = text
         self._locales = locales
         self._variables = variables or {}
         self._locale = locale
+        self._source_locale = source_locale
         self._post_locale_selector = post_locale_selector or PostLocaleSelector[L]
 
     def __str__(self) -> str:
@@ -128,6 +131,7 @@ class LocaleContent[L](str):
                 locales=self._locales,
                 variables=self._variables,
                 locale=locale,
+                source_locale=self._source_locale,
             )
         )
 
@@ -148,6 +152,7 @@ class PostLocaleSelector[L]:
         locales: dict[str, TextMap],
         variables: dict[str, object] | None = None,
         locale: L | str,
+        source_locale: str | None = None,
     ):
         """Set up the post-call selector with translation data.
 
@@ -157,11 +162,16 @@ class PostLocaleSelector[L]:
             variables: A dictionary of f-string variable placeholders
                 and their values.
             locale: The locale identifier.
+            source_locale: The source language code. When the
+                requested locale equals it, the original text is
+                returned as-is (the source language never has a
+                translation).
         """
         self.text = text
         self.locales = locales
         self.variables = variables or {}
         self.locale = locale
+        self.source_locale = source_locale
 
     def __str__(self) -> str:
         return self.__getitem__(self.locale)
@@ -192,6 +202,11 @@ class PostLocaleSelector[L]:
             The formatted and translated string.
         """
         if not isinstance(locale, str):
+            return self._format(self.text)
+        # The source language never has a translation: the source text
+        # is its own "translation". Short-circuit before hashing and
+        # dictionary lookups.
+        if self.source_locale is not None and locale == self.source_locale:
             return self._format(self.text)
         translated = self.locales.get(locale, {}).get(Text.id_of(self.text), self.text)
         return self._format(translated)
@@ -231,8 +246,8 @@ class I18n[L]:
         self._cache: dict[str, ast.Call] = {}
         self._parse_failures: set[str] = set()
 
-        self.source_locale = source_locale
-        self.default_locale = default_locale or source_locale
+        self.source_locale = source_locale.lower()
+        self.default_locale = default_locale or self.source_locale
 
         self.sep = sep
         self.locales_dir = locales_dir
@@ -267,6 +282,7 @@ class I18n[L]:
                 text=original,
                 locales=self.locales,
                 locale=self.default_locale,
+                source_locale=self.source_locale,
                 post_locale_selector=self.post_locale_selector,
             )
         positions = (
@@ -282,6 +298,7 @@ class I18n[L]:
                 text=original,
                 locales=self.locales,
                 locale=self.default_locale,
+                source_locale=self.source_locale,
                 post_locale_selector=self.post_locale_selector,
             )
 
@@ -297,6 +314,7 @@ class I18n[L]:
                 text=original,
                 locales=self.locales,
                 locale=self.default_locale,
+                source_locale=self.source_locale,
                 post_locale_selector=self.post_locale_selector,
             )
         except Exception:
@@ -306,6 +324,7 @@ class I18n[L]:
                 text=original,
                 locales=self.locales,
                 locale=self.default_locale,
+                source_locale=self.source_locale,
                 post_locale_selector=self.post_locale_selector,
             )
 
@@ -332,6 +351,7 @@ class I18n[L]:
                 text=original,
                 locales=self.locales,
                 locale=self.default_locale,
+                source_locale=self.source_locale,
                 post_locale_selector=self.post_locale_selector,
             )
 
@@ -341,6 +361,7 @@ class I18n[L]:
             locales=self.locales,
             variables=result.variables,
             locale=self.default_locale,
+            source_locale=self.source_locale,
             post_locale_selector=self.post_locale_selector,
         )
 
