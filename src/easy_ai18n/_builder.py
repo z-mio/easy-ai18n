@@ -17,8 +17,8 @@ from .errors import TranslationError
 from .translators import BaseTranslator, GoogleTranslator
 
 
-@dataclass(frozen=True, slots=True)
-class SourceEntry:
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _SourceEntry:
     """A translatable source string, decoupled from AST objects.
 
     Built during extraction and carried through the build pipeline.
@@ -36,8 +36,8 @@ class SourceEntry:
     """The placeholder tokens in first-occurrence order."""
 
 
-@dataclass(frozen=True, slots=True)
-class Changes:
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _Changes:
     """What a build must do, expressed as pure set differences.
 
     Attributes:
@@ -47,7 +47,7 @@ class Changes:
             from the source tree (to be removed).
     """
 
-    to_translate: dict[str, tuple[SourceEntry, ...]]
+    to_translate: dict[str, tuple[_SourceEntry, ...]]
     stale: dict[str, frozenset[TextId]]
 
     @property
@@ -153,7 +153,7 @@ class Builder:
 
         self.project_files = self.load_file()
         self._locales = Loader(self.locales_dir).load_locales_file(self.to_locales)
-        self._entries: dict[TextId, SourceEntry] | None = None
+        self._entries: dict[TextId, _SourceEntry] | None = None
 
     # ── Orchestration ────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ class Builder:
         changes = self.compute_changes()
         return await self._build(changes, save_to_file=save_to_file)
 
-    async def _build(self, changes: Changes, *, save_to_file: bool = True) -> bool:
+    async def _build(self, changes: _Changes, *, save_to_file: bool = True) -> bool:
         """Translate the gaps in ``changes`` and persist the merged result."""
         locale_totals = {locale: len(entries) for locale, entries in changes.to_translate.items()}
         locales = self._locales_clean(changes)
@@ -220,18 +220,18 @@ class Builder:
 
     # ── Diffing ──────────────────────────────────────────────────
 
-    def compute_changes(self) -> Changes:
+    def compute_changes(self) -> _Changes:
         """Diff source entries against the existing translations.
 
         Extraction is memoized, so repeated calls (``run`` followed by
         ``build``, repeated ``is_changed`` checks) never re-parse.
 
         Returns:
-            The set differences to apply, as a ``Changes``.
+            The set differences to apply, as a ``_Changes``.
         """
         entries = self.extract_entries()
         entry_ids = set(entries)
-        to_translate: dict[str, tuple[SourceEntry, ...]] = {}
+        to_translate: dict[str, tuple[_SourceEntry, ...]] = {}
         stale: dict[str, frozenset[TextId]] = {}
         for locale in self.to_locales:
             current = self._locales.get(locale)
@@ -244,9 +244,9 @@ class Builder:
             gone = set(current) - entry_ids
             if gone:
                 stale[locale] = frozenset(gone)
-        return Changes(to_translate=to_translate, stale=stale)
+        return _Changes(to_translate=to_translate, stale=stale)
 
-    def _locales_clean(self, changes: Changes) -> dict[str, TextMap]:
+    def _locales_clean(self, changes: _Changes) -> dict[str, TextMap]:
         """Existing translations restricted to the target locales, stale IDs removed.
 
         Copy-on-write: untouched locales keep sharing their original
@@ -271,7 +271,7 @@ class Builder:
     async def _translate_with_retries(
         self,
         locale: str,
-        entries: tuple[SourceEntry, ...],
+        entries: tuple[_SourceEntry, ...],
         handle: ProgressHandle,
     ) -> _LocaleOutcome:
         """Translate one locale, retrying silently up to ``max_retries`` times.
@@ -304,7 +304,7 @@ class Builder:
     async def _translate_locale(
         self,
         locale: str,
-        entries: tuple[SourceEntry, ...],
+        entries: tuple[_SourceEntry, ...],
         handle: ProgressHandle,
     ) -> TextMap:
         """Mask variables, translate, then restore them."""
@@ -321,27 +321,27 @@ class Builder:
 
     # ── Extraction ───────────────────────────────────────────────
 
-    def extract_entries(self) -> dict[TextId, SourceEntry]:
+    def extract_entries(self) -> dict[TextId, _SourceEntry]:
         """Extract every source entry, parsing each file at most once."""
         if self._entries is None:
-            entries: dict[TextId, SourceEntry] = {}
+            entries: dict[TextId, _SourceEntry] = {}
             for file in self.project_files:
                 for entry in self._parse_file(file):
                     entries[entry.id] = entry
             self._entries = entries
         return self._entries
 
-    def _parse_file(self, file: Path) -> list[SourceEntry]:
+    def _parse_file(self, file: Path) -> list[_SourceEntry]:
         """Read and parse one file into source entries (AST objects dropped)."""
         source = file.read_text(encoding="utf-8")
         module = ast.parse(source)
         parser = ASTParser(sep=self.sep, func_names=self.func_names)
-        entries: list[SourceEntry] = []
+        entries: list[_SourceEntry] = []
         for string_data in parser.extract_all(node=module, source_path=file, source=source):
             text = str(string_data.string)
             if not text:
                 continue
-            entries.append(SourceEntry(id=string_data.string.id, text=text, placeholders=tuple(string_data.variables)))
+            entries.append(_SourceEntry(id=string_data.string.id, text=text, placeholders=tuple(string_data.variables)))
         return entries
 
     # ── Scanning and persistence ─────────────────────────────────

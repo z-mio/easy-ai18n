@@ -20,7 +20,7 @@ from ._types import Text
 from .errors import EvaluationError, FormatError, UnsupportedSyntaxError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StringData:
     string: Text
     variables: dict[str, object]
@@ -381,7 +381,7 @@ class ASTParser:
         for call_node in target_nodes:
             validator.validate_call(call_node)
             constructed, vars_found = string_constructor.construct_from_node(call_node, None)
-            results.append(StringData(constructed, vars_found, call_node))
+            results.append(StringData(string=constructed, variables=vars_found, call_node=call_node))
         return results
 
     def extract(
@@ -418,7 +418,7 @@ class ASTParser:
             call_node,
             VariableEvaluator(frame.f_globals, frame.f_locals) if frame else None,
         )
-        return StringData(constructed, vars_found, call_node)
+        return StringData(string=constructed, variables=vars_found, call_node=call_node)
 
     def get_target_nodes(self, node: ast.AST) -> list[ast.Call]:
         visitor = CallVisitor(self.func_names)
