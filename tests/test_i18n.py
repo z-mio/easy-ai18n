@@ -10,8 +10,8 @@ os.putenv("I18N_LOG_LEVEL", "DEBUG")
 
 
 class NoOpTranslator(BaseTranslator):
-    async def _translate_one(self, text: str, target_lang: str) -> str:
-        return str(text)
+    async def translate_chunk(self, texts, target_lang):
+        return {k: str(v) for k, v in texts.items()}
 
 
 def test_build(tmp_path):
