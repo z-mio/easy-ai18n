@@ -5,18 +5,15 @@ Translation function and language selector.
 import inspect
 import sys
 from pathlib import Path
-from types import FrameType
-from typing import TYPE_CHECKING, Self, SupportsIndex
+from types import CodeType, FrameType
+from typing import Self, SupportsIndex
 
 from loguru import logger
 
 from ._loader import Loader
-from ._parser import ASTParser, StringData
+from ._parser import ASTParser, _CompiledCall
 from ._types import Text, TextMap
 from .errors import EvaluationError, FormatError, UnsupportedSyntaxError
-
-if TYPE_CHECKING:
-    import ast
 
 __all__ = [
     "PreLocaleSelector",
@@ -225,6 +222,13 @@ class PostLocaleSelector[L]:
 
 
 class I18n[L]:
+    _CACHE_MAX = 2048
+    """Per-instance cap for compiled call sites and parse failures.
+
+    Hot reload churns keys (a new code object per edit), so the cache
+    must stay bounded; evicted entries are simply re-parsed once.
+    """
+
     def __init__(
         self,
         *,
@@ -250,9 +254,8 @@ class I18n[L]:
             pre_locale_selector: The pre-call locale selector class.
             post_locale_selector: The post-call locale selector class.
         """
-        self._cache: dict[str, ast.Call] = {}
-        self._parse_failures: set[str] = set()
-
+        self._cache: dict[tuple[CodeType, int, str], _CompiledCall] = {}
+        self._parse_failures: set[tuple[CodeType, int, str]] = set()
         self.source_locale = source_locale.lower()
         self.default_locale = default_locale or self.source_locale
 
@@ -271,6 +274,10 @@ class I18n[L]:
         source code at the call site, parses the AST, and resolves
         f-string variables at runtime.
 
+        The static part of each call site (template plus compiled
+        expressions) is cached by ``(code object, call offset, sep)``;
+        every invocation only re-evaluates the expressions.
+
         Args:
             args: The text parts to join and translate.
             sep: The separator between text parts. Defaults to the
@@ -285,88 +292,55 @@ class I18n[L]:
         original = Text(sep.join([str(item) for item in args]))
         f = frame or sys._getframe(1)
         if not f:
-            return self.content(
-                text=original,
-                locales=self.locales,
-                locale=self.default_locale,
-                source_locale=self.source_locale,
-                post_locale_selector=self.post_locale_selector,
-            )
-        positions = (
-            f.f_lineno,
-            f.f_lasti,
-            f.f_code.co_name,
-            f.f_code.co_filename,
-        )
-        cache_key = Text.id_of(str(positions))
+            return self._fallback(original)
+        cache_key = (f.f_code, f.f_lasti, sep)
 
         if cache_key in self._parse_failures:
-            return self.content(
-                text=original,
-                locales=self.locales,
-                locale=self.default_locale,
-                source_locale=self.source_locale,
-                post_locale_selector=self.post_locale_selector,
-            )
+            return self._fallback(original)
 
-        call_node = self._cache.get(cache_key, None)
-
+        parser = ASTParser(sep=sep, func_names=self.func_names)
         try:
-            result = ASTParser(sep=sep, func_names=self.func_names).extract(frame=f, call_node=call_node)
-            return self._handle_cache(original, cache_key, result)
+            compiled = self._cache.get(cache_key)
+            if compiled is None:
+                compiled = parser.compile_from_frame(f)
+                if compiled is None:
+                    self._poison(cache_key)
+                    logger.error(f"I18N parse error: {original}")
+                    return self._fallback(original)
+            result = parser.evaluate(compiled, f)
         except (FormatError, EvaluationError, UnsupportedSyntaxError):
             logger.exception("I18N parse error")
-            self._parse_failures.add(cache_key)
-            return self.content(
-                text=original,
-                locales=self.locales,
-                locale=self.default_locale,
-                source_locale=self.source_locale,
-                post_locale_selector=self.post_locale_selector,
-            )
+            self._poison(cache_key)
+            return self._fallback(original)
         except Exception:
             logger.exception("Unexpected I18N error")
-            self._parse_failures.add(cache_key)
-            return self.content(
-                text=original,
-                locales=self.locales,
-                locale=self.default_locale,
-                source_locale=self.source_locale,
-                post_locale_selector=self.post_locale_selector,
-            )
+            self._poison(cache_key)
+            return self._fallback(original)
 
-    def _handle_cache(self, original: str, cache_key: str, result: StringData | None) -> LocaleContent[L]:
-        """Handle the cache entry and return the result.
-
-        If parsing succeeded, the AST node is cached; otherwise the
-        failure is recorded so the original text is returned on
-        subsequent calls.
-
-        Args:
-            original: The original joined text.
-            cache_key: The cache key derived from the caller's frame
-                position.
-            result: The parsed result, or ``None`` if parsing failed.
-
-        Returns:
-            A ``LocaleContent`` object for the translated text.
-        """
-        if not result:
-            self._parse_failures.add(cache_key)
-            logger.error(f"I18N parse error: {original}")
-            return self.content(
-                text=original,
-                locales=self.locales,
-                locale=self.default_locale,
-                source_locale=self.source_locale,
-                post_locale_selector=self.post_locale_selector,
-            )
-
-        self._cache[cache_key] = result.call_node
+        # FIFO 上限: 热重载产生的死条目恰好是最老的, 先被逐出;
+        self._cache[cache_key] = compiled
+        if len(self._cache) > self._CACHE_MAX:
+            del self._cache[next(iter(self._cache))]
         return self.content(
             text=result.string,
             locales=self.locales,
             variables=result.variables,
+            locale=self.default_locale,
+            source_locale=self.source_locale,
+            post_locale_selector=self.post_locale_selector,
+        )
+
+    def _poison(self, cache_key: tuple[CodeType, int, str]) -> None:
+        """Record a parse failure, clearing the set when it outgrows the cap."""
+        self._parse_failures.add(cache_key)
+        if len(self._parse_failures) > self._CACHE_MAX:
+            self._parse_failures.clear()
+
+    def _fallback(self, original: Text) -> LocaleContent[L]:
+        """Return the untranslated original text when parsing fails."""
+        return self.content(
+            text=original,
+            locales=self.locales,
             locale=self.default_locale,
             source_locale=self.source_locale,
             post_locale_selector=self.post_locale_selector,
