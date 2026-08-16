@@ -205,3 +205,18 @@ idea是知性懂事的姐姐，她能帮你做完所有工作"""
     empty = ""
     assert str(_(f"{empty:>5}")) == "     "
     assert str(_(f"{None}")) == "None"
+
+
+def test_pre_locale_selector_source_short_circuits():
+    """_[source]("...") returns the joined args and never runs t()/parsing."""
+    i18n = EasyAI18n("zh-hans", locales_dir="tests/i18n")
+    _ = i18n.i18n()
+
+    def boom(*args, **kwargs):
+        raise AssertionError("t() must not run for source-locale pre-selection")
+
+    i18n.t = boom
+    assert _["zh-hans"]("你好, 世界") == "你好, 世界"
+    assert _["zh-hans"]("你好", "世界", sep="-") == "你好-世界"
+    assert _["zh-hans"](f"数字: {1}") == "数字: 1"
+    assert _["zh-hans"]("a", "b", sep="-") == "a-b"

@@ -48,6 +48,10 @@ class PreLocaleSelector[L]:
 
         Called via ``_[locale]("text")``.
 
+        When the selected locale is the source language, the joined
+        arguments are already the final text: frame introspection,
+        AST parsing and hashing are skipped entirely.
+
         Args:
             args: The text parts to translate.
             sep: The separator between text parts. Defaults to the
@@ -56,9 +60,12 @@ class PreLocaleSelector[L]:
         Returns:
             The translated string.
         """
+        sep = sep or self.sep
+        if self.locale == self.i18n.source_locale:
+            return sep.join(str(item) for item in args)
         current_frame = inspect.currentframe()
         frame = current_frame.f_back if current_frame else None
-        return self.i18n.t(*args, sep=sep or self.sep, frame=frame)[self.locale]
+        return self.i18n.t(*args, sep=sep, frame=frame)[self.locale]
 
 
 class LocaleContent[L](str):
