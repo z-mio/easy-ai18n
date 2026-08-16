@@ -7,23 +7,24 @@ from __future__ import annotations
 import abc
 import asyncio
 import json
+import re
 from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from . import TextId, TextMap
 from .errors import BuildDependencyError, TranslationError
 
-try:
-    from pydantic import BaseModel, Field
-except ImportError as _import_error:
-    raise BuildDependencyError() from _import_error
+if TYPE_CHECKING:
+    from pydantic_ai import Agent
 
 
 __all__ = [
     "BaseTranslator",
     "GoogleTranslator",
-    "OpenAIItemTranslator",
+    "LLMItemTranslator",
     "TranslatorResult",
-    "OpenAIBulkTranslator",
+    "LLMBulkTranslator",
 ]
 
 
@@ -125,11 +126,46 @@ class GoogleTranslator(BaseTranslator):
 # ── OpenAI ──────────────────────────────────────────────────────
 
 
-class OpenAIItemTranslator(BaseTranslator):
-    """OpenAI translator — one API call per text (with concurrency)."""
+def _create_openai_agent[OutputT](
+    output_type: type[OutputT],
+    *,
+    api_key: str | None,
+    base_url: str | None,
+    model: str,
+    prompt: str,
+) -> Agent[object, OutputT]:
+    """Build an OpenAI-compatible pydantic-ai Agent with translation defaults."""
+    try:
+        from pydantic_ai import Agent
+        from pydantic_ai.models.openai import OpenAIChatModel
+        from pydantic_ai.providers.openai import OpenAIProvider
+        from pydantic_ai.settings import ModelSettings
+    except ImportError as e:
+        raise BuildDependencyError() from e
+
+    # 类型参数不能用于运行期表达式, 这里用 Any; 实际输出类型由 output_type 参数决定
+    return Agent[object, Any](
+        model=OpenAIChatModel(
+            model,
+            provider=OpenAIProvider(api_key=api_key, base_url=base_url),
+        ),
+        output_type=output_type,
+        system_prompt=prompt,
+        model_settings=ModelSettings(temperature=0, thinking=False),
+        retries=3,
+    )
+
+
+class LLMItemTranslator(BaseTranslator):
+    """LLM translator — one API call per text (with concurrency).
+
+    Pass a custom ``agent`` to use any pydantic-ai model or provider;
+    otherwise an OpenAI-compatible agent is built from the other args.
+    """
 
     def __init__(
         self,
+        agent: Agent[object, str] | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
         model: str = "gpt-5-mini",
@@ -137,19 +173,10 @@ class OpenAIItemTranslator(BaseTranslator):
         max_concurrency: int = 10,
     ) -> None:
         super().__init__(batch_size=1, max_concurrency=max_concurrency)
-        from pydantic_ai import Agent
-        from pydantic_ai.models.openai import OpenAIChatModel
-        from pydantic_ai.providers.openai import OpenAIProvider
-        from pydantic_ai.settings import ModelSettings
-
-        self._agent = Agent[object, str](
-            model=OpenAIChatModel(
-                model,
-                provider=OpenAIProvider(api_key=api_key, base_url=base_url),
-            ),
-            system_prompt=prompt,
-            model_settings=ModelSettings(temperature=0, thinking=False),
-            retries=3,
+        self._agent = (
+            agent
+            if agent is not None
+            else _create_openai_agent(str, api_key=api_key, base_url=base_url, model=model, prompt=prompt)
         )
 
     async def translate_chunk(self, texts: TextMap, target_lang: str) -> TextMap:
@@ -162,16 +189,28 @@ class OpenAIItemTranslator(BaseTranslator):
         return result
 
 
-class TranslatorResult(BaseModel):
-    key: str = Field(..., pattern=r"^[0-9a-fA-F]{12}$", strict=True, description="key")
-    value: str = Field(..., description="value")
+@dataclass
+class TranslatorResult:
+    """A single translated item returned by a bulk LLM translator."""
+
+    key: str
+    value: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.key, str) or not re.fullmatch(r"[0-9a-fA-F]{12}", self.key):
+            raise ValueError(f"Invalid key: {self.key!r}, expected 12 hex characters")
 
 
-class OpenAIBulkTranslator(BaseTranslator):
-    """OpenAI translator — multiple items per API call (batch)."""
+class LLMBulkTranslator(BaseTranslator):
+    """LLM translator — multiple items per API call (batch).
+
+    Pass a custom ``agent`` to use any pydantic-ai model or provider;
+    otherwise an OpenAI-compatible agent is built from the other args.
+    """
 
     def __init__(
         self,
+        agent: Agent[object, Any] | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
         model: str = "gpt-5-mini",
@@ -179,20 +218,12 @@ class OpenAIBulkTranslator(BaseTranslator):
         batch_size: int = 50,
     ) -> None:
         super().__init__(batch_size=batch_size, max_concurrency=1)
-        from pydantic_ai import Agent
-        from pydantic_ai.models.openai import OpenAIChatModel
-        from pydantic_ai.providers.openai import OpenAIProvider
-        from pydantic_ai.settings import ModelSettings
-
-        self._agent = Agent[object, list[TranslatorResult]](
-            model=OpenAIChatModel(
-                model,
-                provider=OpenAIProvider(api_key=api_key, base_url=base_url),
-            ),
-            output_type=list[TranslatorResult],
-            system_prompt=prompt,
-            model_settings=ModelSettings(temperature=0, thinking=False),
-            retries=3,
+        self._agent = (
+            agent
+            if agent is not None
+            else _create_openai_agent(
+                list[TranslatorResult], api_key=api_key, base_url=base_url, model=model, prompt=prompt
+            )
         )
 
     async def translate_chunk(self, texts: TextMap, target_lang: str) -> TextMap:
