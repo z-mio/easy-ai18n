@@ -58,6 +58,8 @@ class EasyAI18n:
         exclude: list[str] | None = None,
         translator: BaseTranslator | None = None,
         show_progress: bool = True,
+        concurrent_locales: bool = True,
+        max_retries: int = 1,
     ) -> None:
         """Build translation files (synchronous wrapper).
 
@@ -68,8 +70,13 @@ class EasyAI18n:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
-            show_progress: Whether to display a rich progress bar
-                during translation. Defaults to ``True``.
+            show_progress: Whether to display progress.  ``False`` stays silent.
+                Defaults to ``True``.
+            concurrent_locales: Whether to translate all locales in
+                parallel. Defaults to ``True``; set to ``False`` for
+                rate-limited free APIs.
+            max_retries: Extra attempts per locale after a failure.
+                Defaults to ``1``.
         """
         return asyncio.run(
             self.build_async(
@@ -79,6 +86,8 @@ class EasyAI18n:
                 exclude=exclude,
                 translator=translator,
                 show_progress=show_progress,
+                concurrent_locales=concurrent_locales,
+                max_retries=max_retries,
             )
         )
 
@@ -91,6 +100,8 @@ class EasyAI18n:
         exclude: list[str] | None = None,
         translator: BaseTranslator | None = None,
         show_progress: bool = True,
+        concurrent_locales: bool = True,
+        max_retries: int = 1,
     ) -> None:
         """Build translation files asynchronously.
 
@@ -101,8 +112,13 @@ class EasyAI18n:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
-            show_progress: Whether to display a rich progress bar
-                during translation. Defaults to ``True``.
+            show_progress: Whether to display progress.  ``False`` stays silent.
+                Defaults to ``True``.
+            concurrent_locales: Whether to translate all locales in
+                parallel. Defaults to ``True``; set to ``False`` for
+                rate-limited free APIs.
+            max_retries: Extra attempts per locale after a failure.
+                Defaults to ``1``.
         """
         from ._builder import Builder
 
@@ -117,6 +133,8 @@ class EasyAI18n:
             translator=translator,
             source_locale=self.source_locale,
             show_progress=show_progress,
+            concurrent_locales=concurrent_locales,
+            max_retries=max_retries,
         )
         await builder.run()
 
