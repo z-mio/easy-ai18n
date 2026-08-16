@@ -21,6 +21,7 @@ def test_build(tmp_path):
         to_locales=["en", "ja"],
         include=["test_i18n.py"],
         translator=NoOpTranslator(),
+        show_progress=False,
     )
     assert i18n.locales_dir.joinpath("en.yaml").exists()
     assert i18n.locales_dir.joinpath("ja.yaml").exists()
@@ -45,6 +46,7 @@ def test_build_rejects_await_in_f_string(tmp_path):
             to_locales=["en"],
             include=[source.name],
             translator=NoOpTranslator(),
+            show_progress=False,
         )
 
     message = str(exc_info.value)
@@ -65,6 +67,7 @@ def test_build_allows_await_before_f_string(tmp_path):
         to_locales=["en"],
         include=[source.name],
         translator=NoOpTranslator(),
+        show_progress=False,
     )
 
     assert i18n.locales_dir.joinpath("en.yaml").exists()

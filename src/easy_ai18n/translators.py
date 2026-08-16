@@ -132,10 +132,10 @@ class GoogleTranslator(BaseTranslator):
         return result
 
 
-# ── OpenAI ──────────────────────────────────────────────────────
+# ── LLM ──────────────────────────────────────────────────────
 
 
-def _create_openai_agent[OutputT](
+def _create_agent[OutputT](
     output_type: type[OutputT],
     *,
     api_key: str | None,
@@ -152,7 +152,6 @@ def _create_openai_agent[OutputT](
     except ImportError as e:
         raise BuildDependencyError() from e
 
-    # 类型参数不能用于运行期表达式, 这里用 Any; 实际输出类型由 output_type 参数决定
     return Agent[object, Any](
         model=OpenAIChatModel(
             model,
@@ -160,7 +159,7 @@ def _create_openai_agent[OutputT](
         ),
         output_type=output_type,
         system_prompt=prompt,
-        model_settings=ModelSettings(temperature=0, thinking=False),
+        model_settings=ModelSettings(temperature=0),
         retries=3,
     )
 
@@ -185,7 +184,7 @@ class LLMItemTranslator(BaseTranslator):
         self._agent = (
             agent
             if agent is not None
-            else _create_openai_agent(str, api_key=api_key, base_url=base_url, model=model, prompt=prompt)
+            else _create_agent(str, api_key=api_key, base_url=base_url, model=model, prompt=prompt)
         )
 
     async def translate_chunk(self, texts: TextMap, target_lang: str) -> TextMap:
@@ -230,9 +229,7 @@ class LLMBulkTranslator(BaseTranslator):
         self._agent = (
             agent
             if agent is not None
-            else _create_openai_agent(
-                list[TranslatorResult], api_key=api_key, base_url=base_url, model=model, prompt=prompt
-            )
+            else _create_agent(list[TranslatorResult], api_key=api_key, base_url=base_url, model=model, prompt=prompt)
         )
 
     async def translate_chunk(self, texts: TextMap, target_lang: str) -> TextMap:
@@ -242,5 +239,5 @@ class LLMBulkTranslator(BaseTranslator):
                 f"Translate the text to {target_lang}:\n{text}",
             )
         except Exception as e:
-            raise TranslationError(f"OpenAI translation error: {e}") from e
+            raise TranslationError(f"LLM translation error: {e}") from e
         return {TextId(item.key): item.value for item in response.output}

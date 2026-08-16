@@ -32,6 +32,7 @@ class Builder:
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         translator: BaseTranslator | None = None,
+        show_progress: bool = True,
     ):
         """Set up the translation build pipeline.
 
@@ -48,6 +49,8 @@ class Builder:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
+            show_progress: Whether to display a rich progress bar
+                during translation. Defaults to ``True``.
         """
         self.project_root = project_root or Path(os.getcwd())
         self.include = include or []
@@ -59,6 +62,7 @@ class Builder:
         self.locales_dir = locales_dir
         self.source_locale = source_locale
         self.translator: BaseTranslator = GoogleTranslator() if translator is None else translator
+        self.show_progress = show_progress
 
         self.project_files = self.load_file()
         self._locales = Loader(self.locales_dir).load_locales_file(self.to_locales)
@@ -111,11 +115,11 @@ class Builder:
                         for i, var in enumerate(s.variables.keys()):
                             text = text.replace(f"{{{{{i}}}}}", var)
                         translated_result[TextId(k)] = text
-            except TranslationError:
-                logger.error(f"Translation to {locale} failed")
+            except TranslationError as e:
+                logger.error(f"Translation to {locale} failed: {e}")
                 has_failures = True
-            except Exception:
-                logger.exception(f"Unexpected error translating to {locale}:")
+            except Exception as e:
+                logger.exception(f"Unexpected error translating to {locale}: {e}")
                 has_failures = True
             else:
                 locales.setdefault(locale, {})

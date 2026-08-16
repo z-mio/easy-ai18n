@@ -57,6 +57,7 @@ class EasyAI18n:
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         translator: BaseTranslator | None = None,
+        show_progress: bool = True,
     ) -> None:
         """Build translation files (synchronous wrapper).
 
@@ -67,6 +68,8 @@ class EasyAI18n:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
+            show_progress: Whether to display a rich progress bar
+                during translation. Defaults to ``True``.
         """
         return asyncio.run(
             self.build_async(
@@ -75,6 +78,7 @@ class EasyAI18n:
                 include=include,
                 exclude=exclude,
                 translator=translator,
+                show_progress=show_progress,
             )
         )
 
@@ -86,6 +90,7 @@ class EasyAI18n:
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         translator: BaseTranslator | None = None,
+        show_progress: bool = True,
     ) -> None:
         """Build translation files asynchronously.
 
@@ -96,6 +101,8 @@ class EasyAI18n:
             exclude: File or directory patterns to exclude.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
+            show_progress: Whether to display a rich progress bar
+                during translation. Defaults to ``True``.
         """
         from ._builder import Builder
 
@@ -109,6 +116,7 @@ class EasyAI18n:
             exclude=exclude,
             translator=translator,
             source_locale=self.source_locale,
+            show_progress=show_progress,
         )
         await builder.run()
 
