@@ -1,8 +1,9 @@
 from pathlib import Path
 
 import yaml
+from loguru import logger
 
-from . import TextMap
+from ._types import TextMap
 
 
 class Loader:
@@ -14,26 +15,35 @@ class Loader:
 
         Args:
             locales: An optional list of language codes to load.
-                If ``None``, all YAML files are loaded.
+                If ``None``, all ``*.yaml`` files are loaded; an empty
+                list loads nothing.
 
         Returns:
             A dictionary mapping locale codes to their translation
             dictionaries.
         """
+        wanted = {code.lower() for code in locales} if locales is not None else None
+
         result: dict[str, TextMap] = {}
-        yaml_files = list(self.locales_dir.glob("**/*.yaml"))
-        if locales:
-            yaml_files = [file for file in yaml_files if file.name.split(".")[0] in locales]
-
-        if not yaml_files:
-            return {}
-
-        for file in yaml_files:
-            translation_data = yaml.safe_load(Path(file).read_text(encoding="utf-8"))
-            if not translation_data:
+        for file in sorted(self.locales_dir.rglob("*.yaml")):
+            locale_code = file.stem
+            if wanted is not None and locale_code.lower() not in wanted:
+                continue
+            if locale_code in result:
+                logger.warning(f"Duplicate locale file {file} ignored: {locale_code} already loaded")
                 continue
 
-            locale_code = file.name.split(".")[0]
-            result[locale_code] = translation_data
+            try:
+                with file.open(encoding="utf-8") as f:
+                    data = yaml.load(f, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
+            except (yaml.YAMLError, UnicodeDecodeError) as exc:
+                raise ValueError(f"Failed to parse locale file {file}: {exc}") from exc
+
+            if data is None:
+                continue
+            if not isinstance(data, dict):
+                raise ValueError(f"Expected a mapping in {file}, got {type(data).__name__}")
+            if data:
+                result[locale_code] = data
 
         return result
