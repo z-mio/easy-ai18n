@@ -1,17 +1,3 @@
-"""Translation build progress display — all rich usage lives here.
-
-Three modes:
-- Real terminal with rich installed: a live ``Progress`` bar with a
-  parent task and one tree-indented child task per locale.
-- Non-terminal / dumb terminal with rich installed: a ``LineReporter``
-  that prints a summary up front and a final report on exit.
-- ``show_progress=False``: a no-op handle, completely silent.
-
-rich is a dependency of the ``builder`` extra; when it is missing this
-module raises ``BuildDependencyError`` (same lazy-loading behavior as
-``translators``).
-"""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator

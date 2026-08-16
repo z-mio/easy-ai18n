@@ -1,25 +1,88 @@
-"""
-Translation dictionary builder.
-"""
-
 from __future__ import annotations
 
 import ast
 import asyncio
-import copy
 import os
-from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 from loguru import logger
 
 from ._loader import Loader
-from ._parser import ASTParser, StringData
+from ._parser import ASTParser
 from ._progress import ProgressHandle, translation_progress
 from ._types import TextId, TextMap
 from .errors import TranslationError
 from .translators import BaseTranslator, GoogleTranslator
+
+
+@dataclass(frozen=True, slots=True)
+class SourceEntry:
+    """A translatable source string, decoupled from AST objects.
+
+    Built during extraction and carried through the build pipeline.
+    Unlike the parser's ``StringData``, no AST ``call_node`` is kept,
+    so entries stay cheap to hold and compare.
+    """
+
+    id: TextId
+    """The content-addressed ID of ``text``."""
+
+    text: str
+    """The template text, with ``{variable}`` placeholders intact."""
+
+    placeholders: tuple[str, ...]
+    """The placeholder tokens in first-occurrence order."""
+
+
+@dataclass(frozen=True, slots=True)
+class Changes:
+    """What a build must do, expressed as pure set differences.
+
+    Attributes:
+        to_translate: Locale to the ordered entries whose ID is missing
+            from that locale's YAML file.
+        stale: Locale to the IDs present in the YAML file but absent
+            from the source tree (to be removed).
+    """
+
+    to_translate: dict[str, tuple[SourceEntry, ...]]
+    stale: dict[str, frozenset[TextId]]
+
+    @property
+    def is_empty(self) -> bool:
+        """True when nothing needs translating and nothing needs removing."""
+        return not self.to_translate and not any(self.stale.values())
+
+
+@dataclass(frozen=True, slots=True)
+class _LocaleOutcome:
+    """Result of translating one locale: the texts, or the final error."""
+
+    result: TextMap | None
+    error: str | None
+
+
+# Placeholder masking: translators receive ``\uE000<i>\uE001`` instead of
+# the real ``{variable}`` tokens, so a variable name can never collide
+# with the marker (the old ``{{i}}`` scheme could be corrupted by a
+# literal ``{{0}}`` in the source) and translation cannot mangle it.
+# The markers are restored after translation.
+_MASK_START = "\ue000"
+_MASK_END = "\ue001"
+
+
+def _mask(text: str, placeholders: tuple[str, ...]) -> str:
+    for i, placeholder in enumerate(placeholders):
+        text = text.replace(placeholder, f"{_MASK_START}{i}{_MASK_END}")
+    return text
+
+
+def _restore(text: str, placeholders: tuple[str, ...]) -> str:
+    for i, placeholder in enumerate(placeholders):
+        text = text.replace(f"{_MASK_START}{i}{_MASK_END}", placeholder)
+    return text
 
 
 class Builder:
@@ -37,7 +100,7 @@ class Builder:
         translator: BaseTranslator | None = None,
         show_progress: bool = True,
         concurrent_locales: bool = True,
-        max_retries: int = 1,
+        max_retries: int = 2,
     ):
         """Set up the translation build pipeline.
 
@@ -49,311 +112,275 @@ class Builder:
             to_locales: The target language codes to translate to.
             source_locale: The source language of the translatable
                 strings.
-            project_root: The project root directory.
-            include: File or directory patterns to include.
-            exclude: File or directory patterns to exclude.
+            project_root: The project root directory. Defaults to the
+                current working directory.
+            include: File or directory patterns to include. A path is
+                included when it equals, descends from, or glob-matches
+                a pattern.
+            exclude: File or directory patterns to exclude. Directories
+                matching an exclude pattern are pruned from the walk.
             translator: The translator instance. Defaults to
                 ``GoogleTranslator``.
-            show_progress: Whether to display progress.  ``False`` stays silent.
-                Defaults to ``True``.
+            show_progress: Whether to display progress.  ``False`` stays
+                silent. Defaults to ``True``.
             concurrent_locales: Whether to translate all locales in
                 parallel. ``True`` (default) is faster but issues more
                 API calls at once; set to ``False`` for rate-limited
                 free APIs.
-            max_retries: How many extra attempts a locale gets after
-                a translation failure. Defaults to ``1``.
+            max_retries: How many extra attempts a locale gets after a
+                translation failure. Defaults to ``2``.
         """
-        self.project_root = project_root or Path(os.getcwd())
+        self.project_root = Path(project_root) if project_root else Path.cwd()
+        self.locales_dir = Path(locales_dir)
         self.include = include or []
         self.exclude = exclude or []
         self.default_exclude = [".venv", "venv", ".git", ".idea"]
         self.func_names = func_names
         self.sep = sep
         self.to_locales = [i.lower() for i in to_locales]
-        self.locales_dir = locales_dir
         self.source_locale = source_locale
         self.translator: BaseTranslator = GoogleTranslator() if translator is None else translator
         self.show_progress = show_progress
         self.concurrent_locales = concurrent_locales
-        self.max_retries = max_retries
+        self.max_retries = max(0, max_retries)
 
         self.project_files = self.load_file()
         self._locales = Loader(self.locales_dir).load_locales_file(self.to_locales)
+        self._entries: dict[TextId, SourceEntry] | None = None
+
+    # ── Orchestration ────────────────────────────────────────────
 
     async def run(self) -> None:
-        if not self.is_changed():
+        """Build only when something changed; skip the network otherwise."""
+        changes = self.compute_changes()
+        if changes.is_empty:
             logger.info("Content unchanged, skipping build")
             return
-
-        await self.build()
+        await self._build(changes)
 
     async def build(self, save_to_file: bool = True) -> bool:
-        """Build the translation dictionary.
-
-        Compares the current source strings with the existing
-        translation files, translates new content, and optionally
-        persists the results.
+        """Build the translation dictionaries.
 
         Args:
-            save_to_file: Whether to save the results to YAML files.
+            save_to_file: Whether to persist the results to YAML files.
 
         Returns:
-            ``True`` if the build completed successfully.
+            ``True`` when every target locale was translated.
         """
-        locales, to_be_translated = self.compute_changes()
-        locale_totals = {locale: len(entries) for locale, entries in to_be_translated.items()}
+        changes = self.compute_changes()
+        return await self._build(changes, save_to_file=save_to_file)
 
-        has_failures = False
+    async def _build(self, changes: Changes, *, save_to_file: bool = True) -> bool:
+        """Translate the gaps in ``changes`` and persist the merged result."""
+        locale_totals = {locale: len(entries) for locale, entries in changes.to_translate.items()}
+        locales = self._locales_clean(changes)
         errors: dict[str, str] = {}
-
-        async def run_locale(locale: str) -> TextMap | None:
-            nonlocal has_failures
-            entries = to_be_translated[locale]
-            error: Exception | None = None
-            try:
-                return await self._translate_locale(locale, entries, handle)
-            except TranslationError as e:
-                logger.error(f"Translation to {locale} failed: {e}")
-                error = e
-            except Exception as e:
-                logger.exception(f"Unexpected error translating to {locale}: {e}")
-                error = e
-
-            # Auto-retry: rerun silently so progress is not
-            # double-counted, then top up progress on success.
-            if self.max_retries > 0:
-                handle.retrying(locale)
-                try:
-                    result = await self._translate_locale(locale, entries, ProgressHandle())
-                except TranslationError as e:
-                    logger.error(f"Retry for {locale} failed: {e}")
-                    error = e
-                except Exception as e:
-                    logger.exception(f"Unexpected error retrying {locale}: {e}")
-                    error = e
-                else:
-                    handle.succeed(locale, completed=len(entries))
-                    return result
-
-            handle.fail(locale)
-            errors[locale] = str(error) if error is not None else "unknown error"
-            has_failures = True
-            return None
 
         async with translation_progress(locale_totals, show_progress=self.show_progress) as handle:
             if self.concurrent_locales:
-                results = await asyncio.gather(*(run_locale(locale) for locale in to_be_translated))
+                outcomes = await asyncio.gather(
+                    *(
+                        self._translate_with_retries(locale, entries, handle)
+                        for locale, entries in changes.to_translate.items()
+                    )
+                )
             else:
-                results = [await run_locale(locale) for locale in to_be_translated]
+                outcomes = [
+                    await self._translate_with_retries(locale, entries, handle)
+                    for locale, entries in changes.to_translate.items()
+                ]
 
-            for locale, result in zip(to_be_translated, results, strict=True):
-                if result is None:
+            for locale, outcome in zip(changes.to_translate, outcomes, strict=True):
+                if outcome.result is None:
+                    errors[locale] = outcome.error or "unknown error"
                     continue
-                handle.succeed(locale)
-                locales.setdefault(locale, {})
-                locales[locale] |= result
-            handle.finish(ok=not has_failures)
+                current = locales.get(locale, {})
+                locales[locale] = {**current, **outcome.result}
+            handle.finish(ok=not errors)
 
         handle.report_errors(errors)
 
         if save_to_file:
-            for locale in locales:
-                self.save_to_yaml(locales[locale], locale)
-        return not has_failures
+            for locale in self.to_locales:
+                merged = locales[locale]
+                if merged != self._locales.get(locale):
+                    self.save_to_yaml(merged, locale)
+        # The in-memory view must reflect what was just built, or the
+        # next compute_changes (e.g. a second ``run``) would re-translate
+        # everything it already persisted.
+        self._locales = locales
+        return not errors
+
+    # ── Diffing ──────────────────────────────────────────────────
+
+    def compute_changes(self) -> Changes:
+        """Diff source entries against the existing translations.
+
+        Extraction is memoized, so repeated calls (``run`` followed by
+        ``build``, repeated ``is_changed`` checks) never re-parse.
+
+        Returns:
+            The set differences to apply, as a ``Changes``.
+        """
+        entries = self.extract_entries()
+        entry_ids = set(entries)
+        to_translate: dict[str, tuple[SourceEntry, ...]] = {}
+        stale: dict[str, frozenset[TextId]] = {}
+        for locale in self.to_locales:
+            current = self._locales.get(locale)
+            if current is None:
+                to_translate[locale] = tuple(entries[i] for i in sorted(entries))
+                continue
+            missing = entry_ids - set(current)
+            if missing:
+                to_translate[locale] = tuple(entries[i] for i in sorted(missing))
+            gone = set(current) - entry_ids
+            if gone:
+                stale[locale] = frozenset(gone)
+        return Changes(to_translate=to_translate, stale=stale)
+
+    def _locales_clean(self, changes: Changes) -> dict[str, TextMap]:
+        """Existing translations restricted to the target locales, stale IDs removed.
+
+        Copy-on-write: untouched locales keep sharing their original
+        dictionaries; only locales being modified are copied.
+        """
+        locales: dict[str, TextMap] = {}
+        for locale in self.to_locales:
+            current = self._locales.get(locale)
+            if current is None:
+                locales[locale] = {}
+            else:
+                stale_ids = changes.stale.get(locale)
+                locales[locale] = {k: v for k, v in current.items() if k not in stale_ids} if stale_ids else current
+        return locales
+
+    def is_changed(self) -> bool:
+        """Check whether the translation data has changed."""
+        return not self.compute_changes().is_empty
+
+    # ── Translation ──────────────────────────────────────────────
+
+    async def _translate_with_retries(
+        self,
+        locale: str,
+        entries: tuple[SourceEntry, ...],
+        handle: ProgressHandle,
+    ) -> _LocaleOutcome:
+        """Translate one locale, retrying silently up to ``max_retries`` times.
+
+        The first attempt reports progress through ``handle``; retries
+        run against a no-op handle so progress is never double-counted,
+        and the child task is topped up on success.
+        """
+        attempts = self.max_retries + 1
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                result = await self._translate_locale(locale, entries, handle if attempt == 0 else ProgressHandle())
+            except Exception as e:
+                last_error = e
+                if isinstance(e, TranslationError):
+                    logger.error(f"Translation to {locale} failed (attempt {attempt + 1}/{attempts}): {e}")
+                else:
+                    logger.exception(
+                        f"Unexpected error translating to {locale} (attempt {attempt + 1}/{attempts}): {e}"
+                    )
+                if attempt < attempts - 1:
+                    handle.retrying(locale)
+                continue
+            handle.succeed(locale, completed=len(entries) if attempt > 0 else None)
+            return _LocaleOutcome(result=result, error=None)
+        handle.fail(locale)
+        return _LocaleOutcome(result=None, error=str(last_error) if last_error else "unknown error")
 
     async def _translate_locale(
         self,
         locale: str,
-        entries: list[StringData],
+        entries: tuple[SourceEntry, ...],
         handle: ProgressHandle,
     ) -> TextMap:
-        """Translate every new string of one locale.
-
-        Replaces f-string variable placeholders before translation and
-        restores them afterwards. Raises on failure so the caller can
-        apply retry logic.
-
-        Args:
-            locale: The target language code.
-            entries: Untranslated string data for this locale.
-            handle: Progress handle for chunk-level advancement.
-
-        Returns:
-            The translated texts keyed by ID, with variables restored.
-        """
-        entry_map = {s.string.id: s for s in entries}
-        texts: TextMap = {}
-        for k, s in entry_map.items():
-            if s.variables:
-                text: str = s.string
-                for i, var in enumerate(s.variables.keys()):
-                    text = text.replace(var, f"{{{{{i}}}}}")
-                texts[TextId(k)] = text
-            else:
-                texts[TextId(k)] = s.string
-
-        translated_result = await self.translate(
+        """Mask variables, translate, then restore them."""
+        texts: TextMap = {entry.id: _mask(entry.text, entry.placeholders) for entry in entries}
+        translated = await self.translator.translate(
             texts,
             locale,
             on_progress=lambda n: handle.advance(locale, n),
         )
+        for entry in entries:
+            translated[entry.id] = _restore(translated[entry.id], entry.placeholders)
+        return translated
 
-        for k, s in entry_map.items():
-            if s.variables:
-                text = translated_result[TextId(k)]
-                for i, var in enumerate(s.variables.keys()):
-                    text = text.replace(f"{{{{{i}}}}}", var)
-                translated_result[TextId(k)] = text
-        return translated_result
+    # ── Extraction ───────────────────────────────────────────────
 
-    def compute_changes(self) -> tuple[dict[str, TextMap], dict[str, list[StringData]]]:
-        """Compute changes between source strings and existing translations.
+    def extract_entries(self) -> dict[TextId, SourceEntry]:
+        """Extract every source entry, parsing each file at most once."""
+        if self._entries is None:
+            entries: dict[TextId, SourceEntry] = {}
+            for file in self.project_files:
+                for entry in self._parse_file(file):
+                    entries[entry.id] = entry
+            self._entries = entries
+        return self._entries
 
-        Identifies new strings that need translation and removes
-        translations for strings that no longer exist in the source.
-
-        Returns:
-            A tuple of ``(locales, to_be_translated)``,
-            where ``locales`` is the cleaned-up
-            translation dictionary and ``to_be_translated`` maps
-            locales to lists of untranslated ``StringData``.
-        """
-        entries: dict[TextId, StringData] = {}
-        for file in self.project_files:
-            for string_data in self.extract_strings(file):
-                if not string_data.string:
-                    continue
-                entries[string_data.string.id] = string_data
-
-        locales = copy.deepcopy(self._locales)
-        to_be_translated: dict[str, list[StringData]] = {}
-        for locale in self.to_locales:
-            if locale not in locales:
-                locales.setdefault(locale, {})
-        for locale in list(self._locales.keys()):
-            if locale not in self.to_locales and locale in locales:
-                del locales[locale]
-        updated_locales_id_dict = self.extract_locale_ids(locales)
-        for trans_id, string_data in entries.items():
-            for locale in locales:
-                if trans_id in locales[locale]:
-                    continue
-
-                to_be_translated.setdefault(locale, [])
-                if trans_id not in {string_data.string.id for string_data in to_be_translated[locale]}:
-                    to_be_translated[locale].append(string_data)
-
-        for locale in updated_locales_id_dict:
-            for old_id in list(updated_locales_id_dict[locale]):
-                if old_id in entries:
-                    continue
-                if old_id not in locales[locale]:
-                    continue
-                del locales[locale][TextId(old_id)]
-        return locales, to_be_translated
-
-    def load_file(self) -> list[Path]:
-        project_files: list[Path] = []
-        include_paths = [Path(p) for p in self.include] if self.include else []
-        exclude_paths = [Path(p) for p in self.exclude]
-
-        for root, dirs, files in self.project_root.walk():
-            dirs[:] = [
-                d
-                for d in dirs
-                if not any(
-                    (Path(root) / d).relative_to(self.project_root).match(str(exc))
-                    for exc in self.default_exclude + exclude_paths
-                )
-            ]
-            for fname in files:
-                if not fname.endswith(".py"):
-                    continue
-
-                full = Path(root) / fname
-                rel = full.relative_to(self.project_root)
-
-                if include_paths and not any(str(rel).startswith(str(ip)) for ip in include_paths):
-                    continue
-
-                if any(str(rel).startswith(str(ep)) for ep in exclude_paths):
-                    continue
-
-                project_files.append(full)
-
-        return project_files
-
-    def is_changed(self) -> bool:
-        """Check whether the translation data has changed.
-
-        Returns:
-            ``True`` if there are new or removed strings compared to
-            the existing translation files.
-        """
-
-        locales, to_be_translated = self.compute_changes()
-        return bool(locales != self._locales or to_be_translated)
-
-    async def translate(
-        self,
-        texts: TextMap,
-        to_locale: str,
-        on_progress: Callable[[int], None] | None = None,
-    ) -> TextMap:
-        """Translate texts via the configured translator.
-
-        Args:
-            texts: A dictionary of text IDs to texts.
-            to_locale: The target language code.
-            on_progress: Called with the chunk size after each
-                completed chunk, for progress reporting.
-
-        Returns:
-            A dictionary of translated texts keyed by ID.
-        """
-        return await self.translator.translate(texts, to_locale, on_progress=on_progress)
-
-    def extract_strings(self, file: Path) -> list[StringData]:
-        """Extract all translatable strings from a Python file.
-
-        Args:
-            file: The path to the Python file.
-
-        Returns:
-            A list of ``StringData`` objects for each translation
-            call found in the file.
-        """
+    def _parse_file(self, file: Path) -> list[SourceEntry]:
+        """Read and parse one file into source entries (AST objects dropped)."""
         source = file.read_text(encoding="utf-8")
         module = ast.parse(source)
-        return ASTParser(sep=self.sep, func_names=self.func_names).extract_all(
-            node=module,
-            source_path=file,
-            source=source,
-        )
+        parser = ASTParser(sep=self.sep, func_names=self.func_names)
+        entries: list[SourceEntry] = []
+        for string_data in parser.extract_all(node=module, source_path=file, source=source):
+            text = str(string_data.string)
+            if not text:
+                continue
+            entries.append(SourceEntry(id=string_data.string.id, text=text, placeholders=tuple(string_data.variables)))
+        return entries
 
-    def save_to_yaml(self, texts: TextMap, locale: str) -> None:
-        """Save a translation dictionary to a YAML file.
+    # ── Scanning and persistence ─────────────────────────────────
 
-        Args:
-            texts: The translation dictionary to save.
-            locale: The locale code, used as the filename.
+    def load_file(self) -> list[Path]:
+        """Discover the project's Python files.
+
+        Exclude patterns prune directories from the walk; include
+        patterns filter files.  One matching rule serves both: a path
+        matches when it equals a pattern, descends from it, or
+        glob-matches it.
         """
-        with open(self.locales_dir / f"{locale}.yaml", "w", encoding="utf-8") as f:
-            yaml.dump(texts, f, allow_unicode=True)
+        include = [Path(p) for p in self.include]
+        exclude = [Path(p) for p in self.default_exclude + self.exclude]
+        project_files: list[Path] = []
+        for root, dirs, names in self.project_root.walk():
+            root_rel = Path(root).relative_to(self.project_root)
+            dirs[:] = [d for d in dirs if not self._matches(root_rel / d, exclude)]
+            for name in names:
+                if not name.endswith(".py"):
+                    continue
+                rel = root_rel / name
+                if include and not self._matches(rel, include):
+                    continue
+                project_files.append(Path(root) / name)
+        return project_files
 
     @staticmethod
-    def extract_locale_ids(locales_dict: dict[str, TextMap]) -> dict[str, list[str]]:
-        """Extract all translation IDs from a locales dictionary.
+    def _matches(rel: Path, patterns: list[Path]) -> bool:
+        """True when ``rel`` equals, descends from, or glob-matches a pattern."""
+        for pattern in patterns:
+            if rel == pattern or rel.is_relative_to(pattern) or rel.match(str(pattern)):
+                return True
+        return False
 
-        Args:
-            locales_dict: The locales dictionary.
+    def save_to_yaml(self, texts: TextMap, locale: str) -> None:
+        """Atomically write one locale's dictionary to YAML.
 
-        Returns:
-            A dictionary mapping locale codes to lists of translation
-            IDs.
+        The file is written to a temporary sibling and renamed into
+        place, so an interrupted build never leaves a truncated file.
         """
-
-        if not locales_dict:
-            return {}
-
-        return {locale: list(texts) for locale, texts in locales_dict.items()}
+        self.locales_dir.mkdir(parents=True, exist_ok=True)
+        target = self.locales_dir / f"{locale}.yaml"
+        tmp = target.with_name(f".{target.stem}.{os.getpid()}.tmp")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                yaml.dump(texts, f, allow_unicode=True, sort_keys=True)
+            os.replace(tmp, target)
+        finally:
+            tmp.unlink(missing_ok=True)

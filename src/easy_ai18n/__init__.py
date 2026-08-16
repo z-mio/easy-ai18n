@@ -59,7 +59,7 @@ class EasyAI18n:
         translator: BaseTranslator | None = None,
         show_progress: bool = True,
         concurrent_locales: bool = True,
-        max_retries: int = 1,
+        max_retries: int = 2,
     ) -> None:
         """Build translation files (synchronous wrapper).
 
@@ -76,7 +76,7 @@ class EasyAI18n:
                 parallel. Defaults to ``True``; set to ``False`` for
                 rate-limited free APIs.
             max_retries: Extra attempts per locale after a failure.
-                Defaults to ``1``.
+                Defaults to ``2``.
         """
         return asyncio.run(
             self.build_async(
@@ -101,7 +101,7 @@ class EasyAI18n:
         translator: BaseTranslator | None = None,
         show_progress: bool = True,
         concurrent_locales: bool = True,
-        max_retries: int = 1,
+        max_retries: int = 2,
     ) -> None:
         """Build translation files asynchronously.
 
@@ -118,7 +118,7 @@ class EasyAI18n:
                 parallel. Defaults to ``True``; set to ``False`` for
                 rate-limited free APIs.
             max_retries: Extra attempts per locale after a failure.
-                Defaults to ``1``.
+                Defaults to ``2``.
         """
         from ._builder import Builder
 
