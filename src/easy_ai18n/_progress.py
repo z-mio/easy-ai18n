@@ -20,6 +20,11 @@ except ImportError as _import_error:
 # ── Child task descriptions ─────────────────────────────────────
 
 
+def _lang_label(n: int) -> str:
+    """Plural-aware language-count label, e.g. ``"3 languages"``."""
+    return f"{n} language{'s' if n != 1 else ''}"
+
+
 def _child_desc(
     locale: str,
     index: int,
@@ -47,8 +52,9 @@ def _child_desc(
 
 
 def _make_summary(locale_totals: dict[str, int]) -> str:
-    """Build the degraded-mode summary: one total line + one line per locale."""
-    lines = [f"Translating {sum(locale_totals.values())} items:"]
+    """Build the degraded-mode summary: one total line (language count +
+    item count) + one line per locale."""
+    lines = [f"Translating {_lang_label(len(locale_totals))}, {sum(locale_totals.values())} items:"]
     n = len(locale_totals)
     for i, (locale, count) in enumerate(locale_totals.items(), start=1):
         lines.append(f"{_child_desc(locale, i, n)} ({count})")
@@ -230,7 +236,7 @@ class ProgressHandle:
         it is never pulled up to the total.
         """
         if ok:
-            desc = "[green]✓ all done[/green]"
+            desc = f"[green]✓ all done · {_lang_label(len(self.locale_order))}[/green]"
         else:
             desc = f"[red]✗ build failed ({', '.join(self.failed)})[/red]"
         if self.live is not None:
@@ -264,6 +270,7 @@ async def translation_progress(
     """Set up the progress UI for ``locale_totals`` (locale -> item count).
 
     Display order follows the insertion order of ``locale_totals``.
+    The parent task shows the number of languages being translated.
     Automatic degradation:
     - ``show_progress=False`` / total of 0 → no-op
     - non-terminal / dumb terminal → ``LineReporter``
@@ -300,7 +307,7 @@ async def translation_progress(
         console=console,
     )
     with progress:
-        progress_parent = progress.add_task("Total", total=total)
+        progress_parent = progress.add_task(f"Total · {_lang_label(n)}", total=total)
         progress_children: dict[str, Any] = {}
         n = len(locale_totals)
         for i, (locale, count) in enumerate(locale_totals.items(), start=1):
