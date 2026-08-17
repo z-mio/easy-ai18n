@@ -9,7 +9,7 @@ from typing import Any
 try:
     from rich.console import Console
     from rich.markup import escape
-    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
+    from rich.progress import BarColumn, MofNCompleteColumn, Progress, TaskProgressColumn, TextColumn
     from rich.text import Text
 except ImportError as _import_error:
     from .errors import BuildDependencyError
@@ -253,6 +253,41 @@ class ProgressHandle:
             # escape: [...] inside error messages must not be eaten as markup
             self.console.print(f"  [red]{locale}[/red]: {escape(message)}")
 
+    def report_stats(
+        self,
+        added: dict[str, int] | None = None,
+        removed: dict[str, int] | None = None,
+    ) -> None:
+        """Print per-locale key-delta statistics after the bar has exited.
+
+        Lists every locale with a non-zero delta: keys added by this
+        build and/or keys removed as stale. Locales without changes stay
+        silent; without a console (``show_progress=False``) nothing is
+        printed.
+        """
+        if self.console is None:
+            return
+        added = added or {}
+        removed = removed or {}
+        order = [*self.locale_order, *(locale for locale in removed if locale not in self.locale_order)]
+        lines: list[str] = []
+        for locale in order:
+            a = added.get(locale, 0)
+            r = removed.get(locale, 0)
+            if not a and not r:
+                continue
+            parts = []
+            if a:
+                parts.append(f"[green]+{a} added[/green]")
+            if r:
+                parts.append(f"[red]-{r} removed[/red]")
+            lines.append(f"{locale}: {', '.join(parts)}")
+        if not lines:
+            return
+        self.console.print("")
+        for line in lines:
+            self.console.print(line)
+
 
 # ── Factory ─────────────────────────────────────────────────────
 
@@ -304,12 +339,13 @@ async def translation_progress(
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         MofNCompleteColumn(),
+        TaskProgressColumn(),
         console=console,
     )
     with progress:
+        n = len(locale_totals)
         progress_parent = progress.add_task(f"Total · {_lang_label(n)}", total=total)
         progress_children: dict[str, Any] = {}
-        n = len(locale_totals)
         for i, (locale, count) in enumerate(locale_totals.items(), start=1):
             progress_children[locale] = progress.add_task(_child_desc(locale, i, n), total=count)
         yield ProgressHandle(

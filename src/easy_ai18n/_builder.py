@@ -205,6 +205,14 @@ class Builder:
                 locales[locale] = {**current, **outcome.result}
             handle.finish(ok=not errors)
 
+        # Key deltas: added = newly translated keys (0 when the locale
+        # failed), removed = stale keys dropped from the locale file.
+        added: dict[str, int] = {}
+        for (locale, entries), outcome in zip(changes.to_translate.items(), outcomes, strict=True):
+            if outcome.result is not None:
+                added[locale] = len(entries)
+        removed: dict[str, int] = {locale: len(ids) for locale, ids in changes.stale.items()}
+        handle.report_stats(added=added, removed=removed)
         handle.report_errors(errors)
 
         if save_to_file:
