@@ -4,7 +4,7 @@
     <img src="docs/image/logo.png" width="100" alt="icon">
 </a>
 
-**简单、优雅的 Python3 国际化 (i18n) 工具**
+**简单, 优雅的 Python3 国际化 (i18n) 库**
 
 [![Python](https://img.shields.io/badge/python-3.12+-yellow)](https://www.python.org/)
 [![GitHub stars](https://img.shields.io/github/stars/z-mio/easy-ai18n.svg?style=social&label=Stars)](https://github.com/z-mio/easy-ai18n)
@@ -18,7 +18,7 @@
 
 # 🌍 Easy AI18n
 
-Easy AI18n 是一款现代化的 Python3 国际化工具库, 支持 AI 翻译, 多用户场景以及完整的字符串格式化语法, 让项目全球化变得更加优雅自然
+Easy AI18n 是一个现代化的 Python3 i18n 库, 支持 AI 翻译, 多用户场景以及完整的字符串格式化语法, 让项目全球化变得更加优雅自然
 
 ## ✨ 主要特性:
 

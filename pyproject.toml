@@ -1,7 +1,7 @@
 [project]
 name = "easy-ai18n"
 version = "1.2.1"
-description = "Simple and Elegant Python3 Internationalization (i18n) Tool"
+description = "Simple and Elegant Python3 Internationalization (i18n) Library"
 requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }

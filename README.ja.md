@@ -4,7 +4,7 @@
     <img src="docs/image/logo.png" width="100" alt="icon">
 </a>
 
-**シンプルでエレガントな Python3 国際化 (i18n) ツール**
+**シンプルでエレガントな Python3 国際化 (i18n) ライブラリ**
 
 [![Python](https://img.shields.io/badge/python-3.12+-yellow)](https://www.python.org/)
 [![GitHub stars](https://img.shields.io/github/stars/z-mio/easy-ai18n.svg?style=social&label=Stars)](https://github.com/z-mio/easy-ai18n)
@@ -19,7 +19,7 @@
 # 🌍 Easy AI18n
 
 Easy AI18n は、AI 翻訳、マルチユーザーシナリオ、そして完全な文字列フォーマット構文をサポートするモダンな Python3
-国際化ツールライブラリで、プロジェクトのグローバル化をより優雅で自然なものにします。
+国際化ライブラリで、プロジェクトのグローバル化をより優雅で自然なものにします。
 
 ## ✨ 主な特徴:
 

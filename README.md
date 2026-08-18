@@ -4,7 +4,7 @@
     <img src="docs/image/logo.png" width="100" alt="icon">
 </a>
 
-**Simple and Elegant Python3 Internationalization (i18n) Tool**
+**Simple and Elegant Python3 Internationalization (i18n) Library**
 
 [![Python](https://img.shields.io/badge/python-3.12+-yellow)](https://www.python.org/)
 [![GitHub stars](https://img.shields.io/github/stars/z-mio/easy-ai18n.svg?style=social&label=Stars)](https://github.com/z-mio/easy-ai18n)
